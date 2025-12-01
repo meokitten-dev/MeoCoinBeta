@@ -236,49 +236,34 @@ export default function MeoCoinNetwork() {
   const submitBlock = async (validHash, prevHash, validNonce, requiredDiff) => {
     if (!user) return;
     try {
-      const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
-      const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'global');
-      const newBlockId = `block_${Date.now()}`;
-      const blockRef = doc(db, 'artifacts', appId, 'public', 'data', 'blocks', newBlockId);
-
-      await runTransaction(db, async (transaction) => {
-        // Kiểm tra lại trên server (giả lập)
-        const statsDoc = await transaction.get(statsRef);
-        const currentSupply = statsDoc.exists() ? (statsDoc.data().totalSupply || 0) : 0;
-        
-        // Kiểm tra lại độ khó server-side (Logic khớp với client)
-        // Lưu ý: Ở môi trường thật cần check kỹ hash, nhưng ở đây mình check supply thôi
-        if (currentSupply + BLOCK_REWARD > MAX_SUPPLY) {
-          throw "Đã đạt giới hạn tổng cung!";
-        }
-
-        const userDoc = await transaction.get(userRef);
-        const newBal = (userDoc.data().balance || 0) + BLOCK_REWARD;
-        const newBlocksMined = (userDoc.data().blocksMined || 0) + 1;
-
-        transaction.update(userRef, { balance: newBal, blocksMined: newBlocksMined });
-        transaction.set(statsRef, { totalSupply: currentSupply + BLOCK_REWARD }, { merge: true });
-
-        const newIndex = latestBlockRef.current.index + 1;
-        transaction.set(blockRef, {
-          index: newIndex,
-          hash: validHash,
-          prevHash: prevHash,
-          miner: user.uid,
-          minerName: user.displayName,
+      // Gọi lên Server Vercel để kiểm tra
+      const response = await fetch('/api/mine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
           nonce: validNonce,
-          difficulty: requiredDiff,
-          timestamp: serverTimestamp(),
-          reward: BLOCK_REWARD
-        });
+          clientHash: validHash,
+          minerName: user.displayName
+        })
       });
-      addLog(`💰 +${BLOCK_REWARD} MCN | Supply: ${totalSupplyRef.current}/${MAX_SUPPLY}`, "success");
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Lỗi Server");
+      }
+
+      // Nếu Server bảo OK thì chỉ cần hiện thông báo (Dữ liệu sẽ tự nhảy do onSnapshot)
+      addLog(`💰 Server xác nhận: +${BLOCK_REWARD} MCN!`, "success");
+      
     } catch (e) { 
       console.error(e); 
-      addLog(`Lỗi: ${typeof e === 'string' ? e : 'Block bị từ chối'}`, "error"); 
+      addLog(`❌ Bị từ chối: ${e.message}`, "error"); 
+      // Nếu sai hash, nên reset nhẹ để đồng bộ lại
+      nonceRef.current += 1000; 
     }
   };
-
   // --- 4. OTHER FEATURES ---
   const handleTransfer = async (e) => {
     e.preventDefault();
