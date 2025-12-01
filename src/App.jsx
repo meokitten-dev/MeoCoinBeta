@@ -28,7 +28,8 @@ import {
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
 
-// --- FIREBASE SETUP (Đã điền sẵn cho Meo) ---
+// --- FIREBASE SETUP ---
+// 👇 BƯỚC QUAN TRỌNG NHẤT: Meo điền thông tin vào đây nhé 👇
 const firebaseConfig = {
   apiKey: "AIzaSyDrREROquKxOUFf8GfkkMeaALE929MJDRY",
   authDomain: "meo-coin-net.firebaseapp.com",
@@ -42,7 +43,6 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
-// 👇 RESET SANG V4 👇
 const appId = 'meocoin-network-v4'; 
 
 async function sha256(message) {
@@ -65,26 +65,26 @@ export default function MeoCoinNetwork() {
   const [activeTab, setActiveTab] = useState('miner');
   const [loading, setLoading] = useState(true);
   
+  // State cho chuyển tiền
+  const [recipientId, setRecipientId] = useState('');
+  const [sendAmount, setSendAmount] = useState('');
+  const [txStatus, setTxStatus] = useState(null);
+
   const miningRef = useRef(false);
   const nonceRef = useRef(0);
   const latestBlockRef = useRef({ hash: "genesis-block", index: 0 });
   const totalSupplyRef = useRef(0);
 
-  // --- LOGIC AUTH ---
+  // --- 1. AUTH & INIT ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      if (currentUser) {
-        // Ghi chú: Vì database đã bị khóa Write, ta không thể tự tạo user ở đây nữa.
-        // Server sẽ tự tạo user khi đào được block đầu tiên.
-        addLog(`Chào mừng ${currentUser.displayName}! Hãy bắt đầu đào để kích hoạt ví.`, "info");
-      }
       setLoading(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // --- DATA SYNC ---
+  // --- 2. DATA SYNC ---
   useEffect(() => {
     if (!user) return;
     const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
@@ -115,7 +115,7 @@ export default function MeoCoinNetwork() {
     });
   }, [user]);
 
-  // --- ĐỘ KHÓ 6 GIAI ĐOẠN (KHỚP SERVER) ---
+  // --- 3. MINING ---
   const calculateDifficulty = (currentSupply) => {
     if (currentSupply < 50000) return "0000"; 
     if (currentSupply < 200000) return "00000";
@@ -157,7 +157,6 @@ export default function MeoCoinNetwork() {
       hashes++;
 
       const currentDiff = calculateDifficulty(totalSupplyRef.current);
-      
       if (hash.startsWith(currentDiff)) {
         addLog(`✨ TÌM THẤY: ${hash.substring(0, 8)}...`, "success");
         await submitBlockToServer(hash, nonceRef.current);
@@ -187,8 +186,8 @@ export default function MeoCoinNetwork() {
           nonce: validNonce,
           clientHash: validHash,
           minerName: user.displayName,
-          userEmail: user.email, // Gửi thêm email
-          userPhoto: user.photoURL // Gửi thêm ảnh
+          userEmail: user.email,
+          userPhoto: user.photoURL
         })
       });
       const result = await response.json();
@@ -197,6 +196,40 @@ export default function MeoCoinNetwork() {
     } catch (e) { 
       console.error(e); 
       addLog(`❌ Bị từ chối: ${e.message}`, "error"); 
+    }
+  };
+
+  // --- 4. TÍNH NĂNG CHUYỂN TIỀN (ĐÃ MỞ LẠI VÀ DÙNG API) ---
+  const handleTransfer = async (e) => {
+    e.preventDefault();
+    setTxStatus(null);
+    if (!user) return;
+    const amount = parseInt(sendAmount);
+    if (!amount || amount <= 0) return setTxStatus({type: 'error', msg: 'Số tiền không hợp lệ'});
+    if (amount > balance) return setTxStatus({type: 'error', msg: 'Số dư không đủ'});
+    if (recipientId === user.uid) return setTxStatus({type: 'error', msg: 'Không thể tự chuyển'});
+
+    setTxStatus({type: 'info', msg: 'Đang xử lý giao dịch an toàn...'});
+    try {
+      // Gọi API chuyển tiền thay vì tự chuyển
+      const response = await fetch('/api/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          senderId: user.uid,
+          receiverId: recipientId,
+          amount: amount
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Lỗi giao dịch");
+
+      setTxStatus({type: 'success', msg: '✅ Chuyển tiền thành công!'});
+      setSendAmount('');
+      addLog(`💸 Đã chuyển ${amount} MCN.`, "info");
+    } catch (error) { 
+      setTxStatus({type: 'error', msg: `❌ Lỗi: ${error.message}`}); 
     }
   };
 
@@ -248,7 +281,7 @@ export default function MeoCoinNetwork() {
            <StatBox label="Hashrate" value={`${hashRate} H/s`} icon={<Activity size={20} color={mining ? "#4ade80" : "#737373"}/>} />
            <div className="stat-box" style={{flex: 2, display:'block'}}>
               <div style={{display:'flex', justifyContent:'space-between', marginBottom:'0.2rem'}}>
-                <span className="stat-label">Tổng Cung (Supply)</span>
+                <span className="stat-label">Tổng Cung</span>
                 <span className="stat-label">Level: {currentDifficulty.length} ({currentDifficulty})</span>
               </div>
               <div style={{width:'100%', height:'8px', background:'#262626', borderRadius:'4px', overflow:'hidden'}}>
@@ -299,8 +332,19 @@ export default function MeoCoinNetwork() {
                    <button onClick={() => navigator.clipboard.writeText(user.uid)} style={{background:'#262626', border:'1px solid #14532d', color:'#fff', padding:'0.5rem', borderRadius:'0.5rem', cursor:'pointer'}}><Copy/></button>
                  </div>
                </div>
-               <div className="card" style={{padding:'2rem', textAlign:'center', color:'#737373'}}>
-                 Tạm khóa chuyển tiền để bảo trì.
+               {/* ĐÃ MỞ LẠI FORM CHUYỂN TIỀN */}
+               <div className="card">
+                 <h3 style={{marginBottom:'1rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Send size={18}/> Chuyển Khoản</h3>
+                 <div className="input-group">
+                   <label style={{display:'block', marginBottom:'0.5rem', fontSize:'0.9rem'}}>ID Người Nhận</label>
+                   <input value={recipientId} onChange={(e) => setRecipientId(e.target.value)} className="input-field" placeholder="Nhập ID ví..." />
+                 </div>
+                 <div className="input-group">
+                   <label style={{display:'block', marginBottom:'0.5rem', fontSize:'0.9rem'}}>Số Tiền (MCN)</label>
+                   <input type="number" value={sendAmount} onChange={(e) => setSendAmount(e.target.value)} className="input-field" placeholder="0" />
+                 </div>
+                 <button onClick={handleTransfer} className="btn-send">GỬI</button>
+                 {txStatus && <div style={{marginTop:'1rem', color: txStatus.type==='success'?'#4ade80':'#ef4444'}}>{txStatus.msg}</div>}
                </div>
              </div>
           )}
