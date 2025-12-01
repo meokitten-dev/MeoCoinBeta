@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
-  signInAnonymously, 
-  onAuthStateChanged,
-  signInWithCustomToken 
+  signInWithPopup, 
+  GoogleAuthProvider,
+  signOut,
+  onAuthStateChanged 
 } from 'firebase/auth';
 import { 
   getFirestore, 
@@ -14,32 +15,20 @@ import {
   getDoc, 
   onSnapshot, 
   runTransaction,
-  serverTimestamp 
+  serverTimestamp,
+  query,
+  orderBy,
+  limit
 } from 'firebase/firestore';
 import { 
-  Cpu, 
-  Wifi, 
-  Send, 
-  Activity, 
-  Database, 
-  Lock, 
-  Copy, 
-  Users, 
-  Terminal,
-  RefreshCw,
-  Search,
-  Zap,
-  ShieldCheck,
-  AlertCircle
+  Cpu, Wifi, Send, Activity, Database, Lock, Copy, Users, RefreshCw, Search, Zap, ShieldCheck, LogIn, LogOut, Link, Layers
 } from 'lucide-react';
 
 // --- CẤU HÌNH GAME ---
-const DIFFICULTY = "00"; // Hash bắt đầu bằng 2 số 0
 const BLOCK_REWARD = 50; 
+const MAX_SUPPLY = 1000000; // Giới hạn 1 triệu coin
 
 // --- FIREBASE SETUP ---
-// LƯU Ý: Khi chạy trên máy thật, Meo nhớ thay đoạn này bằng config của Meo nhé!
-// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDrREROquKxOUFf8GfkkMeaALE929MJDRY",
   authDomain: "meo-coin-net.firebaseapp.com",
@@ -49,12 +38,14 @@ const firebaseConfig = {
   appId: "1:980010880222:web:3b195b6791e95d52f9464f"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-// App ID mặc định nếu chưa có
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+const auth = getAuth(app);
+const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
+// 👇 ĐỔI SANG V3 ĐỂ RESET TOÀN BỘ SERVER NHƯ MỚI 👇
+const appId = 'meocoin-network-v3'; 
 
-// --- HÀM HỖ TRỢ (HASHING) ---
+// Hàm băm SHA-256
 async function sha256(message) {
   const msgBuffer = new TextEncoder().encode(message);
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
@@ -63,18 +54,24 @@ async function sha256(message) {
 }
 
 export default function MeoCoinNetwork() {
-  // State
+  // User State
   const [user, setUser] = useState(null);
   const [balance, setBalance] = useState(0);
+  
+  // Network State
   const [networkUsers, setNetworkUsers] = useState([]);
-  const [recentTxs, setRecentTxs] = useState([]);
+  const [blockchain, setBlockchain] = useState([]); 
+  const [totalSupply, setTotalSupply] = useState(0); 
+  
+  // Mining State
   const [mining, setMining] = useState(false);
   const [hashRate, setHashRate] = useState(0);
   const [logs, setLogs] = useState([]);
+  const [currentDifficulty, setCurrentDifficulty] = useState("0"); // Hiển thị độ khó
+  
+  // UI State
   const [activeTab, setActiveTab] = useState('miner');
   const [loading, setLoading] = useState(true);
-  
-  // Wallet Form State
   const [recipientId, setRecipientId] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [txStatus, setTxStatus] = useState(null);
@@ -82,119 +79,124 @@ export default function MeoCoinNetwork() {
   // Refs
   const miningRef = useRef(false);
   const nonceRef = useRef(0);
-  const lastHashRef = useRef("genesis-block");
+  const latestBlockRef = useRef({ hash: "genesis-block", index: 0 });
+  const totalSupplyRef = useRef(0); // Dùng ref để đọc supply mới nhất trong vòng lặp
 
-  // --- 1. KHỞI TẠO & AUTH ---
+  // --- 1. AUTH & INIT ---
   useEffect(() => {
-    let unsubscribeAuth;
-    
-    const initApp = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', currentUser.uid);
+        const userSnap = await getDoc(userRef);
+        
+        if (!userSnap.exists()) {
+          await setDoc(userRef, {
+            address: currentUser.uid,
+            email: currentUser.email,
+            displayName: currentUser.displayName,
+            photoURL: currentUser.photoURL,
+            balance: 0,
+            blocksMined: 0,
+            joinedAt: serverTimestamp(),
+          });
+          addLog(`Chào mừng ${currentUser.displayName}!`, "success");
         }
-
-        unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-          setUser(currentUser);
-          if (currentUser) {
-            // FIX: Thêm 'users' vào đường dẫn để đảm bảo số segment chẵn (6 segments)
-            const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', currentUser.uid);
-            const userSnap = await getDoc(userRef);
-            
-            if (!userSnap.exists()) {
-              await setDoc(userRef, {
-                address: currentUser.uid,
-                balance: 0,
-                blocksMined: 0,
-                joinedAt: serverTimestamp(),
-                lastSeen: serverTimestamp()
-              });
-            }
-            setLoading(false);
-            addLog("Đã kết nối vào MeoNet an toàn.", "info");
-          }
-        });
-      } catch (err) {
-        console.error("Auth Error:", err);
-        setLoading(false);
       }
-    };
-
-    initApp();
-    return () => unsubscribeAuth && unsubscribeAuth();
+      setLoading(false);
+    });
+    return () => unsubscribe();
   }, []);
 
-  // --- 2. ĐỒNG BỘ DỮ LIỆU (REAL-TIME) ---
+  // --- 2. REAL-TIME DATA ---
   useEffect(() => {
     if (!user) return;
 
-    // 2.1 Nghe số dư của mình (FIX path: .../data/users/UID)
+    // Nghe số dư user
     const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
     const unsubBalance = onSnapshot(userRef, (doc) => {
-      if (doc.exists()) {
-        const data = doc.data();
-        setBalance(data.balance || 0);
-      }
-    }, (err) => console.log("Sync Balance Error", err));
+      if (doc.exists()) setBalance(doc.data().balance || 0);
+    });
 
-    // 2.2 Nghe danh sách người dùng (FIX path: .../data/users)
+    // Nghe Top Miners
     const usersCol = collection(db, 'artifacts', appId, 'public', 'data', 'users');
     const unsubUsers = onSnapshot(usersCol, (snapshot) => {
       const users = [];
-      snapshot.forEach(doc => {
-        users.push(doc.data());
-      });
-      // Sort an toàn
+      snapshot.forEach(doc => users.push(doc.data()));
       users.sort((a, b) => (b.balance || 0) - (a.balance || 0));
       setNetworkUsers(users);
-    }, (err) => console.log("Sync Users Error", err));
+    });
 
-    // 2.3 Nghe danh sách giao dịch (FIX path: .../data/transactions)
-    const txCol = collection(db, 'artifacts', appId, 'public', 'data', 'transactions');
-    const unsubTx = onSnapshot(txCol, (snapshot) => {
-      const txs = [];
-      snapshot.forEach(doc => {
-        txs.push(doc.data());
-      });
-      // Sort an toàn theo timestamp
-      txs.sort((a, b) => {
-        const tA = a.timestamp?.seconds || 0;
-        const tB = b.timestamp?.seconds || 0;
-        return tB - tA;
-      });
-      setRecentTxs(txs.slice(0, 15));
-    }, (err) => console.log("Sync Tx Error", err));
+    // Nghe Blockchain 
+    const blocksQuery = query(
+      collection(db, 'artifacts', appId, 'public', 'data', 'blocks'),
+      orderBy('index', 'desc'),
+      limit(10)
+    );
+    const unsubBlocks = onSnapshot(blocksQuery, (snapshot) => {
+      const blocks = [];
+      snapshot.forEach(doc => blocks.push(doc.data()));
+      setBlockchain(blocks);
+      if (blocks.length > 0) {
+        latestBlockRef.current = { hash: blocks[0].hash, index: blocks[0].index };
+      }
+    });
 
-    return () => {
-      unsubBalance();
-      unsubUsers();
-      unsubTx();
-    };
+    // Nghe Tổng Cung & Tính Độ Khó
+    const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'global');
+    const unsubStats = onSnapshot(statsRef, (doc) => {
+      if (doc.exists()) {
+        const supply = doc.data().totalSupply || 0;
+        setTotalSupply(supply);
+        totalSupplyRef.current = supply; // Cập nhật ref
+        
+        // CẬP NHẬT UI ĐỘ KHÓ
+        const diff = calculateDifficulty(supply);
+        setCurrentDifficulty(diff);
+      } else {
+        setDoc(statsRef, { totalSupply: 0 }, { merge: true });
+      }
+    });
+
+    return () => { unsubBalance(); unsubUsers(); unsubBlocks(); unsubStats(); };
   }, [user]);
 
-  // --- 3. LOGIC ĐÀO COIN (MINING) ---
+  // --- 3. MINING LOGIC (DYNAMIC DIFFICULTY) ---
+  
+  // Hàm tính độ khó dựa trên tổng cung
+  const calculateDifficulty = (currentSupply) => {
+    // Giai đoạn 1: < 100k coin -> Dễ (1 số 0) - Để kích thích mọi người chơi
+    if (currentSupply < 100000) return "0"; 
+    // Giai đoạn 2: < 400k coin -> Vừa (2 số 0)
+    if (currentSupply < 400000) return "00";
+    // Giai đoạn 3: < 800k coin -> Khó (3 số 0) - Bắt đầu tốn điện
+    if (currentSupply < 800000) return "000";
+    // Giai đoạn 4: Về đích -> Cực khó (4 số 0) - Đào cả ngày mới ra
+    return "0000";
+  };
+
   const addLog = (msg, type = 'info') => {
-    // Đảm bảo msg luôn là string để tránh lỗi render object
-    const safeMsg = typeof msg === 'string' ? msg : 'System message';
     const time = new Date().toLocaleTimeString();
-    setLogs(prev => [`[${time}] ${safeMsg}`, ...prev].slice(0, 20));
+    setLogs(prev => [{time, msg: String(msg), type}, ...prev].slice(0, 20));
   };
 
   const startMining = () => {
+    if (totalSupplyRef.current >= MAX_SUPPLY) {
+      addLog("⚠️ Đã hết coin để đào! (Max Supply Reached)", "error");
+      return;
+    }
     if (mining) return;
     setMining(true);
     miningRef.current = true;
     mineLoop();
-    addLog("Bắt đầu giải mã thuật toán...", "info");
+    addLog(`🚀 Bắt đầu! Độ khó hiện tại: Level ${calculateDifficulty(totalSupplyRef.current).length}`, "info");
   };
 
   const stopMining = () => {
     setMining(false);
     miningRef.current = false;
     setHashRate(0);
-    addLog("Đã ngắt kết nối máy đào.", "warning");
+    addLog("🛑 Đã dừng máy đào.", "warning");
   };
 
   const mineLoop = async () => {
@@ -203,15 +205,21 @@ export default function MeoCoinNetwork() {
     
     while (miningRef.current) {
       nonceRef.current++;
-      const data = `${user.uid}${lastHashRef.current}${nonceRef.current}`;
+      
+      const prevHash = latestBlockRef.current.hash;
+      const data = `${prevHash}${user.uid}${nonceRef.current}`;
       const hash = await sha256(data);
       hashes++;
 
-      if (hash.startsWith(DIFFICULTY)) {
-        addLog(`✨ TÌM THẤY BLOCK! Hash: ${hash.substring(0, 10)}...`, "success");
-        await submitBlock(hash);
-        nonceRef.current += Math.floor(Math.random() * 1000);
-        await new Promise(r => setTimeout(r, 1000));
+      // Lấy độ khó động (Real-time difficulty)
+      const currentDiff = calculateDifficulty(totalSupplyRef.current);
+
+      if (hash.startsWith(currentDiff)) {
+        addLog(`✨ TÌM THẤY BLOCK! Hash: ${hash.substring(0, 8)}...`, "success");
+        await submitBlock(hash, prevHash, nonceRef.current, currentDiff);
+        
+        nonceRef.current += Math.floor(Math.random() * 10000);
+        await new Promise(r => setTimeout(r, 2000)); 
       }
 
       if (Date.now() - startTime > 1000) {
@@ -225,307 +233,247 @@ export default function MeoCoinNetwork() {
     }
   };
 
-  const submitBlock = async (validHash) => {
+  const submitBlock = async (validHash, prevHash, validNonce, requiredDiff) => {
     if (!user) return;
     try {
-      // FIX Paths
       const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
-      const txRef = doc(db, 'artifacts', appId, 'public', 'data', 'transactions', `tx_${Date.now()}_${user.uid}`);
+      const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'global');
+      const newBlockId = `block_${Date.now()}`;
+      const blockRef = doc(db, 'artifacts', appId, 'public', 'data', 'blocks', newBlockId);
 
       await runTransaction(db, async (transaction) => {
+        // Kiểm tra lại trên server (giả lập)
+        const statsDoc = await transaction.get(statsRef);
+        const currentSupply = statsDoc.exists() ? (statsDoc.data().totalSupply || 0) : 0;
+        
+        // Kiểm tra lại độ khó server-side (Logic khớp với client)
+        // Lưu ý: Ở môi trường thật cần check kỹ hash, nhưng ở đây mình check supply thôi
+        if (currentSupply + BLOCK_REWARD > MAX_SUPPLY) {
+          throw "Đã đạt giới hạn tổng cung!";
+        }
+
         const userDoc = await transaction.get(userRef);
-        if (!userDoc.exists()) throw "User missing";
-
         const newBal = (userDoc.data().balance || 0) + BLOCK_REWARD;
-        const newBlocks = (userDoc.data().blocksMined || 0) + 1;
+        const newBlocksMined = (userDoc.data().blocksMined || 0) + 1;
 
-        transaction.update(userRef, { balance: newBal, blocksMined: newBlocks });
-        transaction.set(txRef, {
-          type: 'REWARD',
-          from: 'NETWORK',
-          to: user.uid,
-          amount: BLOCK_REWARD,
+        transaction.update(userRef, { balance: newBal, blocksMined: newBlocksMined });
+        transaction.set(statsRef, { totalSupply: currentSupply + BLOCK_REWARD }, { merge: true });
+
+        const newIndex = latestBlockRef.current.index + 1;
+        transaction.set(blockRef, {
+          index: newIndex,
           hash: validHash,
-          timestamp: serverTimestamp()
+          prevHash: prevHash,
+          miner: user.uid,
+          minerName: user.displayName,
+          nonce: validNonce,
+          difficulty: requiredDiff,
+          timestamp: serverTimestamp(),
+          reward: BLOCK_REWARD
         });
       });
-      addLog(`💰 Nhận thưởng ${BLOCK_REWARD} MCN!`, "success");
-    } catch (e) {
-      console.error(e);
-      addLog("Lỗi gửi Block lên mạng lưới.", "error");
+      addLog(`💰 +${BLOCK_REWARD} MCN | Supply: ${totalSupplyRef.current}/${MAX_SUPPLY}`, "success");
+    } catch (e) { 
+      console.error(e); 
+      addLog(`Lỗi: ${typeof e === 'string' ? e : 'Block bị từ chối'}`, "error"); 
     }
   };
 
-  // --- 4. GIAO DỊCH (TRANSACTION) ---
+  // --- 4. OTHER FEATURES ---
   const handleTransfer = async (e) => {
     e.preventDefault();
     setTxStatus(null);
     if (!user) return;
-
     const amount = parseInt(sendAmount);
-    if (!amount || amount <= 0) return setTxStatus({type: 'error', msg: 'Số tiền không hợp lệ'});
-    if (amount > balance) return setTxStatus({type: 'error', msg: 'Số dư không đủ'});
-    if (recipientId === user.uid) return setTxStatus({type: 'error', msg: 'Không thể tự chuyển cho mình'});
+    if (!amount || amount <= 0) return setTxStatus({type: 'error', msg: 'Số tiền sai'});
+    if (amount > balance) return setTxStatus({type: 'error', msg: 'Thiếu tiền'});
 
-    setTxStatus({type: 'info', msg: 'Đang xác thực trên Blockchain...'});
-
+    setTxStatus({type: 'info', msg: 'Đang xử lý...'});
     try {
-      // FIX Paths
       const senderRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
       const receiverRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', recipientId);
-      const txRef = doc(db, 'artifacts', appId, 'public', 'data', 'transactions', `tx_${Date.now()}_transfer`);
-
+      
       await runTransaction(db, async (transaction) => {
         const senderDoc = await transaction.get(senderRef);
         const receiverDoc = await transaction.get(receiverRef);
-
-        if (!receiverDoc.exists()) throw "Ví người nhận không tồn tại!";
-        
+        if (!receiverDoc.exists()) throw "Sai địa chỉ ví";
         const senderBal = senderDoc.data().balance;
-        if (senderBal < amount) throw "Số dư không đủ!";
-
+        if (senderBal < amount) throw "Thiếu tiền";
+        
         transaction.update(senderRef, { balance: senderBal - amount });
         transaction.update(receiverRef, { balance: (receiverDoc.data().balance || 0) + amount });
-        transaction.set(txRef, {
-          type: 'TRANSFER',
-          from: user.uid,
-          to: recipientId,
-          amount: amount,
-          timestamp: serverTimestamp()
-        });
       });
-
-      setTxStatus({type: 'success', msg: 'Giao dịch thành công!'});
+      setTxStatus({type: 'success', msg: 'Đã chuyển!'});
       setSendAmount('');
-      addLog(`Đã chuyển ${amount} MCN tới ví khác.`, "info");
-    } catch (error) {
-      const errorMsg = typeof error === 'string' ? error : 'Lỗi mạng lưới';
-      setTxStatus({type: 'error', msg: errorMsg});
-    }
+    } catch (error) { setTxStatus({type: 'error', msg: 'Lỗi giao dịch'}); }
   };
 
-  const copyID = () => {
-    if (user) {
-        const el = document.createElement('textarea');
-        el.value = user.uid;
-        document.body.appendChild(el);
-        el.select();
-        document.execCommand('copy');
-        document.body.removeChild(el);
-        addLog("Đã sao chép ID ví!", "info");
-    }
+  const handleGoogleLogin = async () => {
+    try { await signInWithPopup(auth, googleProvider); } 
+    catch (e) { alert(e.message); }
   };
 
-  // --- UI COMPONENTS ---
-  if (loading) return (
-    <div className="min-h-screen bg-black text-green-500 flex items-center justify-center font-mono">
-      <div className="animate-spin mr-2"><RefreshCw/></div> Đang kết nối vệ tinh...
-    </div>
-  );
+  // --- RENDER UI ---
+  if (loading) return <div style={{height:'100vh', background:'#0a0a0a', color:'#22c55e', display:'flex', justifyContent:'center', alignItems:'center'}}>Đang tải Blockchain... <RefreshCw className="animate-spin"/></div>;
+
+  if (!user) {
+    return (
+      <div style={{height:'100vh', background:'#0a0a0a', color:'#22c55e', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'2rem'}}>
+        <div style={{fontSize:'3rem', fontWeight:'bold', display:'flex', alignItems:'center', gap:'1rem'}}>
+          <Link size={48} className="animate-pulse"/> MEONET V3
+        </div>
+        <button onClick={handleGoogleLogin} style={{background:'#fff', color:'#000', padding:'1rem 2rem', borderRadius:'2rem', fontWeight:'bold', display:'flex', alignItems:'center', gap:'0.5rem', cursor:'pointer'}}>
+          <LogIn size={20}/> Login with Google
+        </button>
+      </div>
+    );
+  }
+
+  const supplyPercent = Math.min((totalSupply / MAX_SUPPLY) * 100, 100);
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-green-500 font-mono flex flex-col md:flex-row overflow-hidden select-none">
-      
+    <div className="app-container">
       {/* SIDEBAR */}
-      <div className="w-full md:w-64 bg-neutral-900 border-r border-green-900/30 flex flex-col p-4 z-20">
-        <div className="mb-8 flex items-center gap-2 text-green-400">
-          <Database className="animate-pulse" />
-          <div>
-            <h1 className="font-bold text-lg leading-none">MEONET</h1>
-            <span className="text-xs text-green-700">v2.1.0 Stable</span>
-          </div>
+      <div className="sidebar">
+        <div className="logo-area">
+          <Link className="animate-pulse" size={24}/>
+          <span>MEONET</span>
         </div>
-
-        <nav className="space-y-2 flex-1">
-          <NavBtn active={activeTab==='miner'} onClick={()=>setActiveTab('miner')} icon={<Cpu size={18}/>} label="Trạm Đào (Miner)" />
-          <NavBtn active={activeTab==='wallet'} onClick={()=>setActiveTab('wallet')} icon={<Lock size={18}/>} label="Ví (Wallet)" />
-          <NavBtn active={activeTab==='explorer'} onClick={()=>setActiveTab('explorer')} icon={<Search size={18}/>} label="Sổ Cái (Explorer)" />
+        <nav className="nav-menu">
+          <NavBtn active={activeTab==='miner'} onClick={()=>setActiveTab('miner')} icon={<Cpu size={18}/>} label="Trạm Đào" />
+          <NavBtn active={activeTab==='wallet'} onClick={()=>setActiveTab('wallet')} icon={<Lock size={18}/>} label="Ví Tiền" />
+          <NavBtn active={activeTab==='explorer'} onClick={()=>setActiveTab('explorer')} icon={<Search size={18}/>} label="Blockchain" />
         </nav>
-
-        <div className="mt-4 pt-4 border-t border-green-900/30 text-xs text-green-700">
-          <div className="flex justify-between mb-1">
-            <span>Nodes:</span> <span>{networkUsers.length}</span>
+        <div className="sidebar-footer">
+          <div style={{display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'1rem'}}>
+            <img src={user.photoURL} style={{width:'24px', borderRadius:'50%'}} />
+            <span style={{fontSize:'0.8rem'}}>{user.displayName}</span>
           </div>
-          <div className="flex justify-between">
-            <span>Diff:</span> <span>{DIFFICULTY}</span>
-          </div>
-          <div className="mt-2 text-center text-green-900 truncate" title={user?.uid}>Connected: {user?.uid.slice(0,6)}...</div>
+          <button onClick={() => signOut(auth)} style={{background:'#262626', color:'#fff', border:'none', padding:'0.5rem', borderRadius:'0.3rem', cursor:'pointer', fontSize:'0.7rem', width: '100%', display:'flex', justifyContent:'center', gap:'0.5rem'}}>
+            <LogOut size={12}/> Đăng Xuất
+          </button>
         </div>
       </div>
 
       {/* MAIN CONTENT */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(0,50,0,0.1)_1px,transparent_1px),linear-gradient(90deg,rgba(0,50,0,0.1)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
-
-        {/* TOP BAR */}
-        <div className="p-4 md:p-6 flex flex-wrap gap-4 border-b border-green-900/30 bg-neutral-900/50 backdrop-blur-sm z-10">
-           <StatBox label="Số Dư Của Bạn" value={`${balance} MCN`} icon={<Zap className="text-yellow-500"/>} />
-           <StatBox label="Hashrate (Tốc độ)" value={`${hashRate} H/s`} icon={<Activity className={mining ? "text-green-400" : "text-gray-600"}/>} />
-           <StatBox label="Trạng Thái Mạng" value="Online" icon={<Wifi className="text-blue-500"/>} />
+      <div className="main-content">
+        <div className="top-bar">
+           <StatBox label="Số Dư" value={`${balance} MCN`} icon={<Zap size={20} color="#facc15"/>} />
+           <StatBox label="Hashrate" value={`${hashRate} H/s`} icon={<Activity size={20} color={mining ? "#4ade80" : "#737373"}/>} />
+           
+           {/* Thanh hiển thị Supply */}
+           <div className="stat-box" style={{flex: 2, display:'block'}}>
+              <div style={{display:'flex', justifyContent:'space-between', marginBottom:'0.2rem'}}>
+                <span className="stat-label">Tổng Cung (Supply)</span>
+                <span className="stat-label">Độ khó: Level {currentDifficulty.length}</span>
+              </div>
+              <div style={{width:'100%', height:'8px', background:'#262626', borderRadius:'4px', overflow:'hidden'}}>
+                <div style={{width:`${supplyPercent}%`, height:'100%', background:'#3b82f6', transition:'width 0.5s'}}></div>
+              </div>
+              <div style={{fontSize:'0.7rem', color:'#737373', marginTop:'0.2rem', textAlign:'right'}}>
+                {totalSupply.toLocaleString()} / {MAX_SUPPLY.toLocaleString()} MCN
+              </div>
+           </div>
         </div>
 
-        {/* CONTENT AREA */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 z-10">
-          
-          {/* --- MINER TAB --- */}
+        <div className="content-area">
+          {/* MINER TAB */}
           {activeTab === 'miner' && (
-            <div className="max-w-3xl mx-auto flex flex-col items-center">
-              <div className={`
-                w-64 h-64 border-4 rounded-full flex flex-col items-center justify-center mb-8 transition-all duration-500 relative
-                ${mining 
-                  ? 'border-green-500 shadow-[0_0_50px_rgba(34,197,94,0.4)] bg-green-900/10' 
-                  : 'border-neutral-800 bg-neutral-900'}
-              `}>
-                <Cpu size={64} className={`mb-4 ${mining ? 'animate-bounce text-green-400' : 'text-neutral-700'}`} />
-                <span className={`text-2xl font-bold ${mining ? 'animate-pulse' : 'text-neutral-600'}`}>
-                  {mining ? 'MINING...' : 'PAUSED'}
-                </span>
+            <div className="miner-screen">
+              <div className={`miner-circle ${mining ? 'active' : ''}`}>
+                <Cpu size={64} color={mining ? "#4ade80" : "#525252"} className={mining ? "animate-bounce" : ""} />
+                <div style={{marginTop:'1rem', fontWeight:'bold', color: mining ? '#4ade80' : '#525252'}}>
+                  {mining ? 'MINING...' : 'IDLE'}
+                </div>
+                {/* Hiển thị độ khó trực quan */}
+                <div style={{fontSize:'0.7rem', color:'#737373', marginTop:'0.5rem'}}>
+                  Target: {currentDifficulty}...
+                </div>
               </div>
-
-              <div className="flex gap-4 mb-8">
+              <div style={{display:'flex', gap:'1rem'}}>
                 {!mining ? (
-                  <button onClick={startMining} className="bg-green-600 hover:bg-green-500 text-black font-bold py-3 px-8 rounded-lg flex items-center gap-2 shadow-lg shadow-green-900/50 transition-all transform hover:scale-105">
-                    <Zap size={20}/> KHỞI ĐỘNG MÁY ĐÀO
-                  </button>
+                  <button onClick={startMining} className="btn-start"><Zap size={20}/> KHỞI ĐỘNG</button>
                 ) : (
-                  <button onClick={stopMining} className="bg-red-900/20 hover:bg-red-900/40 text-red-500 border border-red-900 font-bold py-3 px-8 rounded-lg flex items-center gap-2 transition-all">
-                    <ShieldCheck size={20}/> DỪNG HỆ THỐNG
-                  </button>
+                  <button onClick={stopMining} className="btn-stop"><ShieldCheck size={20}/> DỪNG LẠI</button>
                 )}
               </div>
-
-              <div className="w-full bg-black border border-green-900/50 rounded-lg p-4 font-mono text-xs h-48 overflow-y-auto shadow-inner relative">
-                <div className="absolute top-2 right-2 opacity-50"><Terminal size={14}/></div>
-                {logs.length === 0 && <div className="text-neutral-600 italic">Hệ thống sẵn sàng...</div>}
+              <div className="console-log">
+                {logs.length === 0 && <div style={{color:'#525252'}}>Waiting for command...</div>}
                 {logs.map((log, i) => (
-                  <div key={i} className={`mb-1 ${log.includes('success') ? 'text-yellow-400' : log.includes('error') ? 'text-red-400' : 'text-green-600'}`}>
-                    {'>'} {log}
+                  <div key={i} className={`log-item ${log.type === 'success' ? 'log-success' : log.type === 'error' ? 'log-error' : ''}`}>
+                    {`> [${log.time}] ${log.msg}`}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* --- WALLET TAB --- */}
+          {/* WALLET TAB */}
           {activeTab === 'wallet' && (
-            <div className="max-w-2xl mx-auto">
-              <div className="bg-neutral-900 border border-green-900/50 rounded-xl p-6 mb-6">
-                <h3 className="text-neutral-400 text-sm uppercase tracking-widest mb-2">Địa chỉ ví của Meo</h3>
-                <div className="flex gap-2">
-                  <div className="bg-black flex-1 p-3 rounded border border-green-900/30 font-mono text-green-300 truncate">
-                    {user?.uid}
-                  </div>
-                  <button onClick={copyID} className="bg-green-900/30 hover:bg-green-900/50 px-4 rounded border border-green-800 text-green-400">
-                    <Copy size={20}/>
-                  </button>
+            <div className="wallet-screen">
+              <div className="card">
+                <div style={{fontSize:'0.8rem', color:'#737373', marginBottom:'0.5rem'}}>VÍ CỦA BẠN</div>
+                <div style={{display:'flex', gap:'0.5rem'}}>
+                  <input readOnly value={user?.uid} className="input-field" />
+                  <button onClick={() => navigator.clipboard.writeText(user.uid)} style={{background:'#262626', border:'1px solid #14532d', color:'#fff', padding:'0.5rem', borderRadius:'0.5rem', cursor:'pointer'}}><Copy/></button>
                 </div>
-                <p className="text-xs text-green-800 mt-2">*Gửi mã này cho bạn bè để nhận tiền.</p>
               </div>
-
-              <div className="bg-neutral-900 border border-green-900/50 rounded-xl p-6">
-                <h3 className="text-lg font-bold text-green-400 mb-4 flex items-center gap-2">
-                  <Send size={18}/> Chuyển Khoản
-                </h3>
-                
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm text-neutral-400 mb-1">Người nhận (User ID)</label>
-                    <input 
-                      value={recipientId}
-                      onChange={(e) => setRecipientId(e.target.value)}
-                      placeholder="Nhập ID ví bạn bè..."
-                      className="w-full bg-black border border-green-900 rounded p-3 text-green-300 focus:border-green-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-neutral-400 mb-1">Số lượng (MCN)</label>
-                    <input 
-                      type="number"
-                      value={sendAmount}
-                      onChange={(e) => setSendAmount(e.target.value)}
-                      placeholder="0"
-                      className="w-full bg-black border border-green-900 rounded p-3 text-green-300 focus:border-green-500 outline-none"
-                    />
-                  </div>
-                  
-                  <button onClick={handleTransfer} className="w-full bg-green-700 hover:bg-green-600 text-white font-bold py-3 rounded transition-colors flex justify-center items-center gap-2">
-                    GỬI NGAY <Send size={16}/>
-                  </button>
-
-                  {txStatus && (
-                    <div className={`p-3 rounded text-sm flex items-center gap-2 ${txStatus.type === 'success' ? 'bg-green-900/20 text-green-400' : 'bg-red-900/20 text-red-400'}`}>
-                      {txStatus.type === 'success' ? <ShieldCheck size={16}/> : <AlertCircle size={16}/>}
-                      {txStatus.msg}
-                    </div>
-                  )}
+              <div className="card">
+                <h3 style={{marginBottom:'1rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Send size={18}/> Chuyển Khoản</h3>
+                <div className="input-group">
+                  <label style={{display:'block', marginBottom:'0.5rem', fontSize:'0.9rem'}}>ID Người Nhận</label>
+                  <input value={recipientId} onChange={(e) => setRecipientId(e.target.value)} className="input-field" />
                 </div>
+                <div className="input-group">
+                  <label style={{display:'block', marginBottom:'0.5rem', fontSize:'0.9rem'}}>Số Tiền</label>
+                  <input type="number" value={sendAmount} onChange={(e) => setSendAmount(e.target.value)} className="input-field" />
+                </div>
+                <button onClick={handleTransfer} className="btn-send">GỬI</button>
+                {txStatus && <div style={{marginTop:'1rem', color: txStatus.type==='success'?'#4ade80':'#ef4444'}}>{txStatus.msg}</div>}
               </div>
             </div>
           )}
 
-          {/* --- EXPLORER TAB --- */}
+          {/* EXPLORER TAB */}
           {activeTab === 'explorer' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-neutral-900/50 border border-green-900/30 rounded-xl overflow-hidden">
-                <div className="p-4 border-b border-green-900/30 bg-black/40 font-bold flex items-center gap-2 text-yellow-500">
-                  <Users size={18}/> Top Miners
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-green-900/20 text-green-600 text-left">
-                      <tr>
-                        <th className="p-3">Rank</th>
-                        <th className="p-3">User ID</th>
-                        <th className="p-3 text-right">Blocks</th>
-                        <th className="p-3 text-right">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {networkUsers.map((u, idx) => (
-                        <tr key={u.address || idx} className={`border-b border-green-900/10 hover:bg-green-900/10 ${u.address === user?.uid ? 'bg-green-900/20' : ''}`}>
-                          <td className="p-3 font-bold text-neutral-500">#{idx + 1}</td>
-                          <td className="p-3 font-mono">
-                            {(u.address || '').slice(0, 8)}...
-                            {u.address === user?.uid && <span className="ml-2 text-[10px] bg-green-700 text-white px-1 rounded">YOU</span>}
-                          </td>
-                          <td className="p-3 text-right text-neutral-400">{u.blocksMined || 0}</td>
-                          <td className="p-3 text-right font-bold text-yellow-500">{u.balance || 0}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <div className="explorer-grid">
+              <div className="card" style={{gridColumn: '1 / -1'}}>
+                 <div style={{marginBottom:'1rem', fontWeight:'bold', color:'#3b82f6', display:'flex', alignItems:'center', gap:'0.5rem'}}>
+                   <Layers size={18}/> Chuỗi Khối (Mini Blockchain)
+                 </div>
+                 <div style={{display:'flex', gap:'1rem', overflowX:'auto', paddingBottom:'1rem'}}>
+                    {blockchain.map((block) => (
+                      <div key={block.hash} style={{minWidth:'200px', background:'#171717', border:'1px solid #14532d', padding:'1rem', borderRadius:'0.5rem', position:'relative'}}>
+                         <div style={{fontSize:'0.7rem', color:'#737373', marginBottom:'0.5rem'}}>Block #{block.index}</div>
+                         <div style={{fontSize:'0.8rem', color:'#facc15', fontWeight:'bold', marginBottom:'0.5rem'}}>+{block.reward} MCN</div>
+                         <div style={{fontSize:'0.6rem', color:'#4ade80', wordBreak:'break-all'}}>Hash: {block.hash.slice(0,10)}...</div>
+                         <div style={{fontSize:'0.6rem', color:'#737373', wordBreak:'break-all'}}>Prev: {block.prevHash.slice(0,10)}...</div>
+                         <div style={{fontSize:'0.6rem', color:'#fff', marginTop:'0.5rem'}}>{block.minerName}</div>
+                         <div style={{position:'absolute', right:'-1rem', top:'50%', color:'#14532d'}}>→</div>
+                      </div>
+                    ))}
+                    {blockchain.length === 0 && <div style={{color:'#737373'}}>Chưa có block nào được đào...</div>}
+                 </div>
               </div>
 
-              <div className="bg-neutral-900/50 border border-green-900/30 rounded-xl overflow-hidden flex flex-col h-[500px]">
-                <div className="p-4 border-b border-green-900/30 bg-black/40 font-bold flex items-center gap-2 text-blue-400">
-                  <Activity size={18}/> Giao Dịch Mới
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs">
-                  {recentTxs.map((tx, i) => (
-                    <div key={i} className="border-l-2 border-green-800 pl-3 py-1">
-                      <div className="text-neutral-500 mb-1">
-                        {tx.timestamp?.seconds ? new Date(tx.timestamp.seconds * 1000).toLocaleTimeString() : 'Just now'}
-                      </div>
-                      {tx.type === 'REWARD' ? (
-                        <div className="text-yellow-600">
-                          ⚒️ Reward <span className="text-white">+{tx.amount}</span> to {(tx.to || '').slice(0,6)}
-                        </div>
-                      ) : (
-                        <div className="text-blue-400">
-                          💸 Transfer <span className="text-white">{tx.amount}</span>
-                          <br/>
-                          <span className="opacity-50">{(tx.from || '').slice(0,6)} → {(tx.to || '').slice(0,6)}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  {recentTxs.length === 0 && <div className="text-center text-neutral-600 mt-10">Chưa có giao dịch nào...</div>}
-                </div>
+              <div className="card table-container">
+                <div style={{marginBottom:'1rem', fontWeight:'bold', color:'#facc15', display:'flex', alignItems:'center', gap:'0.5rem'}}><Users size={18}/> Top Miners</div>
+                <table>
+                  <thead><tr><th>Rank</th><th>Miner</th><th>Blocks</th><th>Balance</th></tr></thead>
+                  <tbody>
+                    {networkUsers.map((u, idx) => (
+                      <tr key={u.address} style={{backgroundColor: u.address === user?.uid ? 'rgba(20,83,45,0.2)' : 'transparent'}}>
+                        <td>#{idx + 1}</td>
+                        <td>{u.displayName || u.address.slice(0,8)}</td>
+                        <td>{u.blocksMined || 0}</td>
+                        <td style={{color:'#facc15'}}>{u.balance || 0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
-
         </div>
       </div>
     </div>
@@ -533,20 +481,13 @@ export default function MeoCoinNetwork() {
 }
 
 const NavBtn = ({ active, onClick, icon, label }) => (
-  <button 
-    onClick={onClick}
-    className={`w-full text-left p-3 rounded-lg flex items-center gap-3 transition-all ${active ? 'bg-green-900/40 text-green-300 border border-green-800' : 'text-neutral-500 hover:text-green-400 hover:bg-neutral-800'}`}
-  >
-    {icon} <span className="font-medium text-sm">{label}</span>
+  <button onClick={onClick} className={`nav-btn ${active ? 'active' : ''}`}>
+    {icon} <span>{label}</span>
   </button>
 );
-
 const StatBox = ({ label, value, icon }) => (
-  <div className="flex-1 min-w-[200px] bg-neutral-900 border border-green-900/30 p-4 rounded-xl flex items-center justify-between">
-    <div>
-      <div className="text-xs text-neutral-500 uppercase tracking-wider mb-1">{label}</div>
-      <div className="text-xl font-bold font-mono">{value}</div>
-    </div>
-    <div className="p-3 bg-black rounded-lg border border-green-900/20">{icon}</div>
+  <div className="stat-box">
+    <div><div className="stat-label">{label}</div><div className="stat-value">{value}</div></div>
+    <div>{icon}</div>
   </div>
 );
