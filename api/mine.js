@@ -15,7 +15,7 @@ if (!getApps().length) {
 
 const db = getFirestore();
 const MAX_SUPPLY = 1000000;
-const BLOCK_REWARD = 50;
+const BLOCK_REWARD = 10;
 
 // Hàm tính hash trên server (để đối chiếu với client)
 function calculateHash(prevHash, userId, nonce) {
@@ -25,10 +25,10 @@ function calculateHash(prevHash, userId, nonce) {
 
 // Hàm lấy độ khó hiện tại (phải khớp logic với Client)
 function getDifficulty(currentSupply) {
-  if (currentSupply < 100000) return "0";
-  if (currentSupply < 400000) return "00";
-  if (currentSupply < 800000) return "000";
-  return "0000";
+  if (currentSupply < 100000) return "00";
+  if (currentSupply < 400000) return "000";
+  if (currentSupply < 800000) return "0000";
+  return "00000";
 }
 
 export default async function handler(req, res) {

@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 // --- CẤU HÌNH GAME ---
-const BLOCK_REWARD = 50; 
+const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; // Giới hạn 1 triệu coin
 
 // --- FIREBASE SETUP ---
