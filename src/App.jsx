@@ -165,14 +165,12 @@ export default function MeoCoinNetwork() {
   
   // Hàm tính độ khó dựa trên tổng cung
   const calculateDifficulty = (currentSupply) => {
-    // Giai đoạn 1: < 100k coin -> Dễ (1 số 0) - Để kích thích mọi người chơi
-    if (currentSupply < 100000) return "0"; 
-    // Giai đoạn 2: < 400k coin -> Vừa (2 số 0)
-    if (currentSupply < 400000) return "00";
-    // Giai đoạn 3: < 800k coin -> Khó (3 số 0) - Bắt đầu tốn điện
-    if (currentSupply < 800000) return "000";
-    // Giai đoạn 4: Về đích -> Cực khó (4 số 0) - Đào cả ngày mới ra
-    return "0000";
+    if (currentSupply < 50000) return "0000"; 
+    if (currentSupply < 200000) return "00000";
+    if (currentSupply < 400000) return "00000";
+    if (currentSupply < 600000) return "000000";
+    if (currentSupply < 800000) return "000000";
+    return "0000000";
   };
 
   const addLog = (msg, type = 'info') => {
