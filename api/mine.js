@@ -11,38 +11,34 @@ if (!getApps().length) {
 }
 
 const db = getFirestore();
+// 👇 CẤU HÌNH V4 👇
+const VERSION = 'meocoin-network-v4'; 
 const MAX_SUPPLY = 1000000;
-const BLOCK_REWARD = 10; // Giảm thưởng xuống 10 để đào được lâu
+const BLOCK_REWARD = 10; 
 
 function calculateHash(prevHash, userId, nonce) {
   const data = `${prevHash}${userId}${nonce}`;
   return crypto.createHash('sha256').update(data).digest('hex');
 }
 
-// HÀM ĐỘ KHÓ MỚI (6 GIAI ĐOẠN)
+// 👇 HÀM ĐỘ KHÓ 6 GIAI ĐOẠN 👇
 function getDifficulty(currentSupply) {
-  // Giai đoạn 1: Khởi động (0 - 50k coin)
-  // Độ khó: 4 số 0 (Trung bình 1-5 phút/block)
+  // GĐ 1: Khởi động (0 - 50k) -> 4 số 0
   if (currentSupply < 50000) return "0000"; 
   
-  // Giai đoạn 2: Thử thách (50k - 200k coin)
-  // Độ khó: 5 số 0 (Khó gấp 16 lần gđ 1 - Rất tốn thời gian)
+  // GĐ 2: Thử thách (50k - 200k) -> 5 số 0
   if (currentSupply < 200000) return "00000";
   
-  // Giai đoạn 3: Kiên trì (200k - 400k coin)
-  // Vẫn giữ 5 số 0 để mọi người quen với nhịp độ
+  // GĐ 3: Kiên trì (200k - 400k) -> Giữ 5 số 0
   if (currentSupply < 400000) return "00000";
 
-  // Giai đoạn 4: Cao thủ (400k - 600k coin)
-  // Độ khó: 6 số 0 (Siêu khó - Dành cho "trâu cày" thực thụ)
+  // GĐ 4: Cao thủ (400k - 600k) -> 6 số 0
   if (currentSupply < 600000) return "000000";
 
-  // Giai đoạn 5: Bền vững (600k - 800k coin)
-  // Giữ nguyên 6 số 0 để duy trì game lâu dài (giai đoạn này kéo dài cả năm)
+  // GĐ 5: Bền vững (600k - 800k) -> Giữ 6 số 0
   if (currentSupply < 800000) return "000000";
 
-  // Giai đoạn 6: Huyền thoại (800k - 1M coin)
-  // Độ khó: 7 số 0 (Gần như không thể đào bằng web thường - Cực kỳ quý hiếm)
+  // GĐ 6: Huyền thoại (800k - 1M) -> 7 số 0
   return "0000000";
 }
 
@@ -56,12 +52,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Dùng version v4 để reset dữ liệu mới
-    const version = 'meocoin-network-v4';
-    
-    const statsRef = db.collection('artifacts').doc(version).collection('public').doc('data').collection('stats').doc('global');
-    const blocksRef = db.collection('artifacts').doc(version).collection('public').doc('data').collection('blocks');
-    const userRef = db.collection('artifacts').doc(version).collection('public').doc('data').collection('users').doc(userId);
+    const statsRef = db.collection('artifacts').doc(VERSION).collection('public').doc('data').collection('stats').doc('global');
+    const blocksRef = db.collection('artifacts').doc(VERSION).collection('public').doc('data').collection('blocks');
+    const userRef = db.collection('artifacts').doc(VERSION).collection('public').doc('data').collection('users').doc(userId);
 
     await db.runTransaction(async (t) => {
       const statsDoc = await t.get(statsRef);
@@ -79,13 +72,12 @@ export default async function handler(req, res) {
         newIndex = latestBlock.index + 1;
       }
 
-      // KIỂM TRA HASH VÀ ĐỘ KHÓ
+      // KIỂM TRA HASH
       const serverCalculatedHash = calculateHash(prevHash, userId, nonce);
       const requiredDiff = getDifficulty(currentSupply);
 
       if (serverCalculatedHash !== clientHash) throw new Error("Hash không khớp!");
       
-      // Quan trọng: Server check độ khó ở đây
       if (!serverCalculatedHash.startsWith(requiredDiff)) {
         throw new Error(`Hash yếu! Cần bắt đầu bằng '${requiredDiff}'`);
       }
