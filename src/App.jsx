@@ -75,20 +75,9 @@ export default function MeoCoinNetwork() {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) {
-          await setDoc(userRef, {
-            address: currentUser.uid,
-            email: currentUser.email,
-            displayName: currentUser.displayName,
-            photoURL: currentUser.photoURL,
-            balance: 0,
-            blocksMined: 0,
-            joinedAt: serverTimestamp(),
-          });
-          addLog(`Chào mừng ${currentUser.displayName}!`, "success");
-        }
+        // Ghi chú: Vì database đã bị khóa Write, ta không thể tự tạo user ở đây nữa.
+        // Server sẽ tự tạo user khi đào được block đầu tiên.
+        addLog(`Chào mừng ${currentUser.displayName}! Hãy bắt đầu đào để kích hoạt ví.`, "info");
       }
       setLoading(false);
     });
@@ -197,7 +186,9 @@ export default function MeoCoinNetwork() {
           userId: user.uid,
           nonce: validNonce,
           clientHash: validHash,
-          minerName: user.displayName
+          minerName: user.displayName,
+          userEmail: user.email, // Gửi thêm email
+          userPhoto: user.photoURL // Gửi thêm ảnh
         })
       });
       const result = await response.json();

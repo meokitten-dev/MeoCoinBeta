@@ -11,7 +11,6 @@ if (!getApps().length) {
 }
 
 const db = getFirestore();
-// 👇 CẤU HÌNH V4 👇
 const VERSION = 'meocoin-network-v4'; 
 const MAX_SUPPLY = 1000000;
 const BLOCK_REWARD = 10; 
@@ -21,31 +20,20 @@ function calculateHash(prevHash, userId, nonce) {
   return crypto.createHash('sha256').update(data).digest('hex');
 }
 
-// 👇 HÀM ĐỘ KHÓ 6 GIAI ĐOẠN 👇
 function getDifficulty(currentSupply) {
-  // GĐ 1: Khởi động (0 - 50k) -> 4 số 0
   if (currentSupply < 50000) return "0000"; 
-  
-  // GĐ 2: Thử thách (50k - 200k) -> 5 số 0
   if (currentSupply < 200000) return "00000";
-  
-  // GĐ 3: Kiên trì (200k - 400k) -> Giữ 5 số 0
   if (currentSupply < 400000) return "00000";
-
-  // GĐ 4: Cao thủ (400k - 600k) -> 6 số 0
   if (currentSupply < 600000) return "000000";
-
-  // GĐ 5: Bền vững (600k - 800k) -> Giữ 6 số 0
   if (currentSupply < 800000) return "000000";
-
-  // GĐ 6: Huyền thoại (800k - 1M) -> 7 số 0
   return "0000000";
 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { userId, nonce, clientHash, minerName } = req.body;
+  // 👇 Lấy thêm thông tin user để tạo ví nếu cần
+  const { userId, nonce, clientHash, minerName, userEmail, userPhoto } = req.body;
 
   if (!userId || !nonce || !clientHash) {
     return res.status(400).json({ error: 'Thiếu thông tin' });
@@ -72,23 +60,33 @@ export default async function handler(req, res) {
         newIndex = latestBlock.index + 1;
       }
 
-      // KIỂM TRA HASH
       const serverCalculatedHash = calculateHash(prevHash, userId, nonce);
       const requiredDiff = getDifficulty(currentSupply);
 
       if (serverCalculatedHash !== clientHash) throw new Error("Hash không khớp!");
-      
-      if (!serverCalculatedHash.startsWith(requiredDiff)) {
-        throw new Error(`Hash yếu! Cần bắt đầu bằng '${requiredDiff}'`);
-      }
+      if (!serverCalculatedHash.startsWith(requiredDiff)) throw new Error(`Hash yếu! Cần bắt đầu bằng '${requiredDiff}'`);
 
       const userDoc = await t.get(userRef);
-      if (!userDoc.exists) throw new Error("User chưa kích hoạt!");
-
-      t.update(userRef, {
-        balance: FieldValue.increment(BLOCK_REWARD),
-        blocksMined: FieldValue.increment(1)
-      });
+      
+      // 👇 LOGIC MỚI: Tự động tạo user nếu chưa có (Thay vì báo lỗi)
+      if (!userDoc.exists) {
+        t.set(userRef, {
+          address: userId,
+          email: userEmail || "",
+          displayName: minerName || "Miner",
+          photoURL: userPhoto || "",
+          balance: BLOCK_REWARD, // Thưởng luôn block đầu tiên
+          blocksMined: 1,
+          joinedAt: FieldValue.serverTimestamp(),
+          lastSeen: FieldValue.serverTimestamp()
+        });
+      } else {
+        t.update(userRef, {
+          balance: FieldValue.increment(BLOCK_REWARD),
+          blocksMined: FieldValue.increment(1),
+          lastSeen: FieldValue.serverTimestamp()
+        });
+      }
 
       t.set(statsRef, { totalSupply: FieldValue.increment(BLOCK_REWARD) }, { merge: true });
 
