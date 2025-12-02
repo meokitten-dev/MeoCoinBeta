@@ -1,16 +1,22 @@
 // Đây là cuốn nhật ký hành trình của MeoCoin
 
 export const UPDATE_HISTORY = [
+  { version: "v4.9 (Lastest)",
+    date: "Vừa xong",
+    title: "Tab Tài Khoản Riêng 👤", 
+    desc: "Tách phần thông tin cá nhân và đăng xuất sang tab riêng trên Mobile cho thoáng.", 
+    color: "#8b5cf6" 
+  },
   {
-    version: "v4.8",
-    date: "Hôm nay",
+    version: "v4.8 (New)",
+    date: "Vừa xong",
     title: "Mobile Header Profile 👤",
     desc: "Đã hiện lại Avatar và nút Đăng xuất ngay trên giao diện điện thoại. Tối ưu lại bố cục mobile.",
     color: "#3b82f6"
   },
   {
-    version: "v4.7",
-    date: "Hôm qua",
+    version: "v4.7 (New)",
+    date: "Vừa xong",
     title: "Mobile UI & Session Fix 📱",
     desc: "Sửa lỗi giao diện mất menu trên điện thoại và lỗi đăng nhập 2 nơi.",
     color: "#10b981"
