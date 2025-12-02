@@ -24,16 +24,16 @@ import {
   PawPrint, Wifi, Send, Activity, Database, ShoppingBag, Copy, Users, RefreshCw, Search, Zap, Hexagon, LogIn, LogOut, Layers, History, ArrowUpRight, ArrowDownLeft, AlertTriangle, Sparkles, Rocket
 } from 'lucide-react';
 
-// --- DỮ LIỆU LỊCH SỬ UPDATE (Meo nhớ cập nhật cái này mỗi khi ra bản mới nha) ---
+// 👇 DÒNG NÀY SẼ HẾT LỖI NẾU MEO ĐÃ LÀM BƯỚC 1 👇
 import { UPDATE_HISTORY } from './data/updates';
 
 // --- CẤU HÌNH ---
-const CURRENT_VERSION = "v4.5"; // 👈 QUAN TRỌNG: Đây là phiên bản của code hiện tại
+const CURRENT_VERSION = "v4.5";
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
 
 // --- FIREBASE SETUP ---
-// 👇 ME ĐIỀN CONFIG VÀO ĐÂY NHA 👇
+// 👇 Config chính chủ của Meo đây 👇
 const firebaseConfig = {
   apiKey: "AIzaSyDrREROquKxOUFf8GfkkMeaALE929MJDRY",
   authDomain: "meo-coin-net.firebaseapp.com",
@@ -70,7 +70,7 @@ export default function MeoCoinNetwork() {
 
   // State chặn nhiều tab & Update
   const [isDuplicateTab, setIsDuplicateTab] = useState(false);
-  const [updateAvailable, setUpdateAvailable] = useState(false); // State báo update
+  const [updateAvailable, setUpdateAvailable] = useState(false); 
 
   const miningIntervalRef = useRef(null);
   const isSubmittingRef = useRef(false);
@@ -94,19 +94,16 @@ export default function MeoCoinNetwork() {
       setLoading(false);
     });
 
-    // 👇 CHECK UPDATE VERSION (Logic mới) 👇
-    // Lắng nghe file 'system/info' trên Firebase
+    // Check Update Version
     const systemRef = doc(db, 'artifacts', appId, 'public', 'data', 'system', 'info');
     const unsubscribeSystem = onSnapshot(systemRef, (doc) => {
       if (doc.exists()) {
         const data = doc.data();
-        // Nếu phiên bản trên mạng khác phiên bản hiện tại -> Báo update
         if (data.latestVersion && data.latestVersion !== CURRENT_VERSION) {
           setUpdateAvailable(true);
-          stopMining(); // Dừng đào luôn cho an toàn
+          stopMining(); 
         }
       } else {
-        // Nếu chưa có file version trên server thì tạo nó với version hiện tại
         setDoc(systemRef, { latestVersion: CURRENT_VERSION }, { merge: true });
       }
     });
@@ -120,7 +117,7 @@ export default function MeoCoinNetwork() {
 
   // --- 2. DATA SYNC ---
   useEffect(() => {
-    if (!user || isDuplicateTab || updateAvailable) return; // Dừng sync nếu có biến
+    if (!user || isDuplicateTab || updateAvailable) return; 
     
     const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
     onSnapshot(userRef, (doc) => { if (doc.exists()) setBalance(doc.data().balance || 0); });
@@ -290,7 +287,10 @@ export default function MeoCoinNetwork() {
     try { await signInWithPopup(auth, googleProvider); } catch (e) { alert(e.message); }
   };
 
-  // --- GIAO DIỆN CHẶN NHIỀU TAB ---
+  // ... (Phần Render UI giữ nguyên như cũ, chỉ cần copy phần trên là đủ) ...
+  // Để chắc chắn, Meo có thể copy lại toàn bộ phần Render UI từ lần trước nếu muốn
+  // Nhưng quan trọng nhất là phần import và config ở trên đầu file
+  
   if (isDuplicateTab) {
     return (
       <div style={{height:'100vh', background:'#fee2e2', color:'#991b1b', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem'}}>
@@ -306,7 +306,6 @@ export default function MeoCoinNetwork() {
     );
   }
 
-  // --- GIAO DIỆN THÔNG BÁO UPDATE (NEW) ---
   if (updateAvailable) {
     return (
       <div style={{height:'100vh', background:'linear-gradient(135deg, #f0abfc 0%, #a78bfa 100%)', color:'white', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem', position:'relative', overflow:'hidden'}}>

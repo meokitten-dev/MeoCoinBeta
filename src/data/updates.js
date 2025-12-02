@@ -2,6 +2,13 @@
 
 export const UPDATE_HISTORY = [
   {
+    version: "v4.5 (New)",
+    date: "Vừa xong",
+    title: "Hệ Thống Thông Báo Update 🔔",
+    desc: "Tính năng tự động nhắc nhở người chơi reset trang khi có phiên bản mới.",
+    color: "#f43f5e"
+  },
+  {
     version: "v4.4 (New)",
     date: "Vừa xong",
     title: "Chế Độ Đơn Nhiệm & Tối Ưu Log 🚀",
