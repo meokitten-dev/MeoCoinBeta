@@ -2,7 +2,7 @@
 
 export const UPDATE_HISTORY = [
   {
-    version: "v4.3",
+    version: "v4.3 (New)",
     date: "02-12-2025",
     title: "Lịch Sử Giao Dịch & Tách File 📂",
     desc: "Thêm tính năng xem dòng tiền vào/ra. Tái cấu trúc code: tách dữ liệu lịch sử sang file riêng để dễ quản lý.",

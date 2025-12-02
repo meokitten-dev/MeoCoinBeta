@@ -367,7 +367,7 @@ export default function MeoCoinNetwork() {
                              {isReceive ? <ArrowDownLeft size={20}/> : <ArrowUpRight size={20}/>}
                            </div>
                            <div>
-                             <div style={{fontWeight:'700', color:'#334155'}}>{isReceive ? 'Nhận tiền' : 'Chuyển tiền'}</div>
+                             <div style={{fontWeight:'700', color:'#334155'}}>{isReceive ? 'Nhận Meow' : 'Chuyển Meow'}</div>
                              <div style={{fontSize:'0.75rem', color:'#94a3b8'}}>{tx.timestamp ? new Date(tx.timestamp.seconds * 1000).toLocaleString() : 'Just now'}</div>
                            </div>
                          </div>
