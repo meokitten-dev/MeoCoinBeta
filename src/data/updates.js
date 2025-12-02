@@ -2,11 +2,18 @@
 
 export const UPDATE_HISTORY = [
   {
-    version: "v4.7 (Latest)",
-    date: "Vừa xong",
-    title: "Kiểm Tra Hệ Thống Update 📡",
-    desc: "Phiên bản này dùng để kiểm tra tính năng tự động thông báo cập nhật.",
-    color: "#8b5cf6" // Tím mộng mơ
+    version: "v4.8",
+    date: "Hôm nay",
+    title: "Mobile Header Profile 👤",
+    desc: "Đã hiện lại Avatar và nút Đăng xuất ngay trên giao diện điện thoại. Tối ưu lại bố cục mobile.",
+    color: "#3b82f6"
+  },
+  {
+    version: "v4.7",
+    date: "Hôm qua",
+    title: "Mobile UI & Session Fix 📱",
+    desc: "Sửa lỗi giao diện mất menu trên điện thoại và lỗi đăng nhập 2 nơi.",
+    color: "#10b981"
   },
   {
     version: "v4.6 (New)",

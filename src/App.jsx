@@ -24,10 +24,10 @@ import {
   PawPrint, Wifi, Send, Activity, Database, ShoppingBag, Copy, Users, RefreshCw, Search, Zap, Hexagon, LogIn, LogOut, Layers, History, ArrowUpRight, ArrowDownLeft, AlertTriangle, Sparkles, Rocket
 } from 'lucide-react';
 
-
+// 👇 DỮ LIỆU DỰ PHÒNG CHO PREVIEW (TRÊN MÁY MEO XÓA ĐI DÙNG IMPORT)
 import { UPDATE_HISTORY } from './data/updates';
 
-const CURRENT_VERSION = "v4.7"; 
+const CURRENT_VERSION = "v4.8"; 
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
 
@@ -68,17 +68,21 @@ export default function MeoCoinNetwork() {
   const [isDuplicateTab, setIsDuplicateTab] = useState(false);
   const [isSessionInvalid, setIsSessionInvalid] = useState(false); 
   const [updateAvailable, setUpdateAvailable] = useState(false); 
-  
-  // 👇 CỜ MỚI: Chỉ khi session sẵn sàng mới bắt đầu sync
   const [isSessionReady, setIsSessionReady] = useState(false);
-  const localSessionIdRef = useRef(null);
+  
+  // 👇 State mới: Kiểm tra xem có phải Mobile không
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
+  const localSessionIdRef = useRef(null);
   const miningIntervalRef = useRef(null);
   const isSubmittingRef = useRef(false);
   const totalSupplyRef = useRef(0);
 
-  // --- 1. AUTH & SESSION INIT ---
+  // --- 1. INIT & RESIZE LISTENER ---
   useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+
     const channel = new BroadcastChannel('meocoin_channel');
     channel.postMessage({ type: 'NEW_TAB_OPENED' });
     channel.onmessage = (event) => {
@@ -90,7 +94,6 @@ export default function MeoCoinNetwork() {
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
-        // 👇 QUY TRÌNH CHUẨN: Lấy Session ID TRƯỚC -> setUser SAU
         try {
           const res = await fetch('/api/session', {
             method: 'POST',
@@ -100,13 +103,10 @@ export default function MeoCoinNetwork() {
           const data = await res.json();
           if (data.sessionId) {
             localSessionIdRef.current = data.sessionId;
-            console.log("✅ Session ID mới:", data.sessionId);
-            setIsSessionReady(true); // Bật đèn xanh
+            setIsSessionReady(true);
           }
-        } catch (e) {
-          console.error("Lỗi Session:", e);
-        }
-        setUser(currentUser); // Lúc này user vào nhưng session có thể chưa xong
+        } catch (e) { console.error(e); }
+        setUser(currentUser); 
       } else {
         setUser(null);
         setIsSessionReady(false);
@@ -114,7 +114,6 @@ export default function MeoCoinNetwork() {
       setLoading(false);
     });
 
-    // Check Version
     const systemRef = doc(db, 'artifacts', appId, 'public', 'data', 'system', 'info');
     const unsubscribeSystem = onSnapshot(systemRef, (doc) => {
       if (doc.exists()) {
@@ -129,32 +128,25 @@ export default function MeoCoinNetwork() {
     });
 
     return () => {
+      window.removeEventListener('resize', handleResize);
       unsubscribe();
       unsubscribeSystem();
       channel.close();
     };
   }, []);
 
-  // --- 2. DATA SYNC & REAL-TIME SECURITY ---
+  // --- 2. DATA SYNC ---
   useEffect(() => {
-    // 👇 THÊM ĐIỀU KIỆN: Phải có Session Ready mới chạy sync
     if (!user || isDuplicateTab || updateAvailable || isSessionInvalid || !isSessionReady) return; 
     
-    console.log("🛡️ Bắt đầu giám sát bảo mật với Session:", localSessionIdRef.current);
-
     const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
     const unsubUser = onSnapshot(userRef, (doc) => { 
       if (doc.exists()) {
         const data = doc.data();
         setBalance(data.balance || 0);
-
-        // CHECK KICK-OUT
-        if (localSessionIdRef.current && data.currentSessionId) {
-          if (data.currentSessionId !== localSessionIdRef.current) {
-            console.warn("🚫 PHÁT HIỆN ĐĂNG NHẬP NƠI KHÁC!");
-            setIsSessionInvalid(true);
-            stopMining();
-          }
+        if (localSessionIdRef.current && data.currentSessionId && data.currentSessionId !== localSessionIdRef.current) {
+          setIsSessionInvalid(true);
+          stopMining();
         }
       }
     });
@@ -187,23 +179,14 @@ export default function MeoCoinNetwork() {
       const txs = [];
       snap.forEach(doc => {
         const data = doc.data();
-        if (data.from === user.uid || data.to === user.uid) {
-          txs.push(data);
-        }
+        if (data.from === user.uid || data.to === user.uid) txs.push(data);
       });
       setMyTransactions(txs);
     });
 
-    return () => {
-      unsubUser(); unsubUsers(); unsubBlocks(); unsubStats(); unsubTx();
-    };
+    return () => { unsubUser(); unsubUsers(); unsubBlocks(); unsubStats(); unsubTx(); };
+  }, [user, isDuplicateTab, updateAvailable, isSessionInvalid, isSessionReady]);
 
-  }, [user, isDuplicateTab, updateAvailable, isSessionInvalid, isSessionReady]); // Thêm dependency isSessionReady
-
-  // ... (PHẦN LOGIC ĐÀO & UI GIỮ NGUYÊN NHƯ CŨ - CHỈ COPY LẠI THÔI) ...
-  // Để tiết kiệm không gian chat, Meo copy lại phần MINING và RENDER UI từ file cũ nha!
-  // Hoặc nếu Meo cần Mira gửi full 100% file này thì bảo Mira nhé.
-  
   // --- 3. MINING ---
   const calculateLevel = (currentSupply) => {
     if (currentSupply < 50000) return 1; 
@@ -274,21 +257,13 @@ export default function MeoCoinNetwork() {
       const response = await fetch('/api/mine', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          minerName: user.displayName,
-          userEmail: user.email,
-          userPhoto: user.photoURL
-        })
+        body: JSON.stringify({ userId: user.uid, minerName: user.displayName, userEmail: user.email, userPhoto: user.photoURL })
       });
       const result = await response.json();
       
       if (!response.ok) {
-        if (response.status === 429) {
-            addLog("⏳ Đào nhanh quá! Đợi xíu...", "error");
-        } else {
-            throw new Error(result.error || "Lỗi Server");
-        }
+        if (response.status === 429) addLog("⏳ Đào nhanh quá! Đợi xíu...", "error");
+        else throw new Error(result.error || "Lỗi Server");
       } else {
         addLog(`🍯 +${BLOCK_REWARD} MeoCoin về túi!`, "success");
       }
@@ -312,11 +287,7 @@ export default function MeoCoinNetwork() {
       const response = await fetch('/api/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          senderId: user.uid,
-          receiverId: recipientId,
-          amount: amount
-        })
+        body: JSON.stringify({ senderId: user.uid, receiverId: recipientId, amount: amount })
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Lỗi giao dịch");
@@ -332,63 +303,34 @@ export default function MeoCoinNetwork() {
     try { await signInWithPopup(auth, googleProvider); } catch (e) { alert(e.message); }
   };
 
-  // --- GIAO DIỆN BỊ ĐĂNG XUẤT (KICKED OUT) ---
-  if (isSessionInvalid) {
-    return (
-      <div style={{height:'100vh', background:'#1e293b', color:'#f87171', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem'}}>
-        <ShieldAlert size={80} className="animate-pulse"/>
-        <div>
-          <h1 style={{fontSize:'2rem', fontWeight:'bold', marginBottom:'0.5rem'}}>Tài khoản đã đăng nhập nơi khác!</h1>
-          <p style={{color:'#94a3b8'}}>Để bảo mật, phiên đăng nhập này đã bị hủy.</p>
-        </div>
-        <button onClick={() => window.location.reload()} style={{background:'#ef4444', color:'white', border:'none', padding:'1rem 3rem', borderRadius:'50px', cursor:'pointer', fontWeight:'bold', fontSize:'1.1rem', boxShadow:'0 10px 25px rgba(239, 68, 68, 0.3)'}}>
-          Đăng nhập lại tại đây
+  if (isDuplicateTab) return (
+    <div style={{height:'100vh', background:'#fee2e2', color:'#991b1b', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem'}}>
+      <AlertTriangle size={64} className="animate-bounce"/>
+      <div><h1 style={{fontSize:'2rem', fontWeight:'bold', marginBottom:'0.5rem'}}>Đã mở ở tab khác!</h1><p>Vui lòng chỉ dùng 1 tab.</p></div>
+      <button onClick={() => window.location.reload()} style={{background:'#991b1b', color:'white', border:'none', padding:'1rem 2rem', borderRadius:'50px', cursor:'pointer', fontWeight:'bold', fontSize:'1rem'}}>Sử dụng ở tab này</button>
+    </div>
+  );
+
+  if (updateAvailable) return (
+    <div style={{height:'100vh', background:'linear-gradient(135deg, #f0abfc 0%, #a78bfa 100%)', color:'white', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem', position:'relative', overflow:'hidden'}}>
+      <div style={{background:'rgba(255,255,255,0.2)', backdropFilter:'blur(20px)', padding:'3rem', borderRadius:'30px', border:'1px solid rgba(255,255,255,0.3)', boxShadow:'0 20px 50px rgba(0,0,0,0.2)', maxWidth:'500px'}}>
+        <Sparkles size={64} className="animate-pulse" style={{margin:'0 auto 1rem', color:'#fde047'}}/>
+        <h1 style={{fontSize:'2.5rem', fontWeight:'800', marginBottom:'0.5rem', textShadow:'0 2px 10px rgba(0,0,0,0.1)'}}>Cập Nhật Mới! ✨</h1>
+        <p style={{fontSize:'1.1rem', marginBottom:'2rem', lineHeight:'1.5'}}>MeoCoin đã có phiên bản xịn hơn. Vui lòng tải lại trang!</p>
+        <button onClick={() => window.location.reload()} style={{background:'white', color:'#d946ef', border:'none', padding:'1rem 3rem', borderRadius:'50px', cursor:'pointer', fontWeight:'800', fontSize:'1.2rem', display:'flex', alignItems:'center', gap:'0.5rem', margin:'0 auto', boxShadow:'0 10px 25px rgba(0,0,0,0.1)', transition:'transform 0.2s'}}>
+          <Rocket size={24}/> Cập Nhật Ngay
         </button>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // --- GIAO DIỆN CHẶN NHIỀU TAB ---
-  if (isDuplicateTab) {
-    return (
-      <div style={{height:'100vh', background:'#fee2e2', color:'#991b1b', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem'}}>
-        <AlertTriangle size={64} className="animate-bounce"/>
-        <div>
-          <h1 style={{fontSize:'2rem', fontWeight:'bold', marginBottom:'0.5rem'}}>Ứng dụng đang mở ở tab khác!</h1>
-          <p>Để bảo mật và tránh lỗi dữ liệu, MeoCoin chỉ cho phép chạy trên một tab duy nhất.</p>
-        </div>
-        <button onClick={() => window.location.reload()} style={{background:'#991b1b', color:'white', border:'none', padding:'1rem 2rem', borderRadius:'50px', cursor:'pointer', fontWeight:'bold', fontSize:'1rem'}}>
-          Sử dụng ở tab này
-        </button>
-      </div>
-    );
-  }
-
-  if (updateAvailable) {
-    return (
-      <div style={{height:'100vh', background:'linear-gradient(135deg, #f0abfc 0%, #a78bfa 100%)', color:'white', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem', position:'relative', overflow:'hidden'}}>
-        <div style={{background:'rgba(255,255,255,0.2)', backdropFilter:'blur(20px)', padding:'3rem', borderRadius:'30px', border:'1px solid rgba(255,255,255,0.3)', boxShadow:'0 20px 50px rgba(0,0,0,0.2)', maxWidth:'500px'}}>
-          <Sparkles size={64} className="animate-pulse" style={{margin:'0 auto 1rem', color:'#fde047'}}/>
-          <h1 style={{fontSize:'2.5rem', fontWeight:'800', marginBottom:'0.5rem', textShadow:'0 2px 10px rgba(0,0,0,0.1)'}}>Cập Nhật Mới! ✨</h1>
-          <p style={{fontSize:'1.1rem', marginBottom:'2rem', lineHeight:'1.5'}}>
-            MeoCoin đã có phiên bản xịn hơn. Vui lòng tải lại trang để trải nghiệm tính năng mới nhé!
-          </p>
-          <button 
-            onClick={() => window.location.reload()} 
-            style={{
-              background:'white', color:'#d946ef', border:'none', padding:'1rem 3rem', borderRadius:'50px', 
-              cursor:'pointer', fontWeight:'800', fontSize:'1.2rem', display:'flex', alignItems:'center', gap:'0.5rem',
-              margin:'0 auto', boxShadow:'0 10px 25px rgba(0,0,0,0.1)', transition:'transform 0.2s'
-            }}
-            onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
-            onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
-          >
-            <Rocket size={24}/> Cập Nhật Ngay
-          </button>
-        </div>
-      </div>
-    );
-  }
+  if (isSessionInvalid) return (
+    <div style={{height:'100vh', background:'#1e293b', color:'#f87171', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem'}}>
+      <ShieldAlert size={80} className="animate-pulse"/>
+      <div><h1 style={{fontSize:'2rem', fontWeight:'bold', marginBottom:'0.5rem'}}>Đăng nhập nơi khác!</h1><p style={{color:'#94a3b8'}}>Phiên này đã bị hủy để bảo mật.</p></div>
+      <button onClick={() => window.location.reload()} style={{background:'#ef4444', color:'white', border:'none', padding:'1rem 3rem', borderRadius:'50px', cursor:'pointer', fontWeight:'bold', fontSize:'1.1rem', boxShadow:'0 10px 25px rgba(239, 68, 68, 0.3)'}}>Đăng nhập lại</button>
+    </div>
+  );
 
   if (loading) return <div style={{height:'100vh', background:'#fce7f3', color:'#db2777', display:'flex', justifyContent:'center', alignItems:'center', fontWeight:'bold'}}>Đang gọi mèo về... <RefreshCw className="animate-spin" style={{marginLeft:'10px'}}/></div>;
 
@@ -406,6 +348,20 @@ export default function MeoCoinNetwork() {
 
   const supplyPercent = Math.min((totalSupply / MAX_SUPPLY) * 100, 100);
 
+  // 👇 ĐỊNH NGHĨA STYLE CHO USER PROFILE
+  // Trên PC thì nằm dưới, nền mờ. Trên Mobile thì nằm ngang, không nền.
+  const userProfileStyle = isMobile ? {
+    display: 'flex', alignItems: 'center', gap: '0.5rem'
+  } : {
+    display: 'flex', alignItems: 'center', gap: '0.8rem', marginBottom: '1rem'
+  };
+
+  const userSectionStyle = isMobile ? {
+    display: 'flex', alignItems: 'center', gap: '1rem'
+  } : {
+    background: 'rgba(255, 255, 255, 0.5)', padding: '1rem', borderRadius: '20px', fontSize: '0.85rem'
+  };
+
   return (
     <div className="app-container">
       <div className="sidebar">
@@ -413,24 +369,40 @@ export default function MeoCoinNetwork() {
           <PawPrint className="animate-bounce" size={32} color="#d946ef"/>
           <span>MEONET</span>
         </div>
+        
+        {/* 👇 PROFILE CHO MOBILE (HIỆN Ở HEADER) */}
+        {isMobile && (
+           <div style={{display:'flex', alignItems:'center', gap:'0.5rem'}}>
+             <img src={user.photoURL} style={{width:'32px', borderRadius:'50%', border:'2px solid white'}} />
+             <button onClick={() => signOut(auth)} style={{background:'#fee2e2', color:'#ef4444', border:'none', padding:'0.5rem', borderRadius:'10px', cursor:'pointer'}}>
+               <LogOut size={18}/>
+             </button>
+           </div>
+        )}
+
         <nav className="nav-menu">
-          <NavBtn active={activeTab==='miner'} onClick={()=>setActiveTab('miner')} icon={<Zap size={20}/>} label="Nông Trại Mèo" />
-          <NavBtn active={activeTab==='wallet'} onClick={()=>setActiveTab('wallet')} icon={<ShoppingBag size={20}/>} label="Túi Thần Kỳ" />
-          <NavBtn active={activeTab==='explorer'} onClick={()=>setActiveTab('explorer')} icon={<Search size={20}/>} label="Sổ Cái Mèo" />
-          <NavBtn active={activeTab==='updates'} onClick={()=>setActiveTab('updates')} icon={<History size={20}/>} label="Nhật Ký Update" />
+          <NavBtn active={activeTab==='miner'} onClick={()=>setActiveTab('miner')} icon={<Zap size={20}/>} label="Nông Trại" />
+          <NavBtn active={activeTab==='wallet'} onClick={()=>setActiveTab('wallet')} icon={<ShoppingBag size={20}/>} label="Ví Tiền" />
+          <NavBtn active={activeTab==='explorer'} onClick={()=>setActiveTab('explorer')} icon={<Search size={20}/>} label="Sổ Cái" />
+          <NavBtn active={activeTab==='updates'} onClick={()=>setActiveTab('updates')} icon={<History size={20}/>} label="Nhật Ký" />
         </nav>
-        <div className="sidebar-footer">
-          <div style={{display:'flex', alignItems:'center', gap:'0.8rem', marginBottom:'1rem'}}>
-            <img src={user.photoURL} style={{width:'36px', borderRadius:'50%', border:'2px solid white', boxShadow:'0 2px 5px rgba(0,0,0,0.1)'}} />
-            <span style={{fontSize:'0.9rem', fontWeight:'700', color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'120px'}}>{user.displayName}</span>
+
+        {/* 👇 PROFILE CHO PC (HIỆN Ở DƯỚI CÙNG) */}
+        {!isMobile && (
+          <div className="sidebar-footer">
+            <div style={userProfileStyle}>
+              <img src={user.photoURL} style={{width:'36px', borderRadius:'50%', border:'2px solid white', boxShadow:'0 2px 5px rgba(0,0,0,0.1)'}} />
+              <span style={{fontSize:'0.9rem', fontWeight:'700', color:'#475569', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'120px'}}>{user.displayName}</span>
+            </div>
+            <button onClick={() => signOut(auth)} style={{background:'#fee2e2', color:'#ef4444', border:'none', padding:'0.8rem', borderRadius:'15px', cursor:'pointer', fontSize:'0.8rem', width: '100%', display:'flex', justifyContent:'center', gap:'0.5rem', fontWeight:'700', transition:'background 0.2s'}}>
+              <LogOut size={16}/> Đăng Xuất
+            </button>
           </div>
-          <button onClick={() => signOut(auth)} style={{background:'#fee2e2', color:'#ef4444', border:'none', padding:'0.8rem', borderRadius:'15px', cursor:'pointer', fontSize:'0.8rem', width: '100%', display:'flex', justifyContent:'center', gap:'0.5rem', fontWeight:'700', transition:'background 0.2s'}}>
-            <LogOut size={16}/> Đăng Xuất
-          </button>
-        </div>
+        )}
       </div>
 
       <div className="main-content">
+        {/* ... PHẦN NỘI DUNG GIỮ NGUYÊN ... */}
         <div className="top-bar">
            <StatBox label="Tài Sản" value={`${balance} MCN`} icon={<Hexagon size={24} color="#f59e0b" fill="#fcd34d"/>} />
            <StatBox label="Tốc Độ Ảo" value={`~${hashRate} H/s`} icon={<Activity size={24} color="#3b82f6"/>} />
@@ -498,7 +470,6 @@ export default function MeoCoinNetwork() {
                  {txStatus && <div style={{marginTop:'1rem', padding:'1rem', background: txStatus.type==='success'?'#dcfce7':'#fee2e2', color: txStatus.type==='success'?'#166534':'#991b1b', borderRadius:'15px', fontWeight:'600', textAlign:'center'}}>{txStatus.msg}</div>}
                </div>
 
-               {/* BẢNG LỊCH SỬ GIAO DỊCH */}
                <div className="card">
                  <h3 style={{marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.8rem', color:'#334155'}}><History size={24} color="#f59e0b"/> Lịch Sử Giao Dịch</h3>
                  <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
@@ -512,7 +483,7 @@ export default function MeoCoinNetwork() {
                              {isReceive ? <ArrowDownLeft size={20}/> : <ArrowUpRight size={20}/>}
                            </div>
                            <div>
-                             <div style={{fontWeight:'700', color:'#334155'}}>{isReceive ? 'Nhận Coin' : 'Chuyển Coin'}</div>
+                             <div style={{fontWeight:'700', color:'#334155'}}>{isReceive ? 'Nhận Meow' : 'Chuyển Meow'}</div>
                              <div style={{fontSize:'0.75rem', color:'#94a3b8'}}>{tx.timestamp ? new Date(tx.timestamp.seconds * 1000).toLocaleString() : 'Just now'}</div>
                            </div>
                          </div>
@@ -577,7 +548,6 @@ export default function MeoCoinNetwork() {
             </div>
           )}
 
-          {/* TAB NHẬT KÝ */}
           {activeTab === 'updates' && (
             <div className="explorer-grid">
                <div className="card" style={{gridColumn: '1 / -1'}}>
