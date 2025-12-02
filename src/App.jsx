@@ -24,16 +24,16 @@ import {
   PawPrint, Wifi, Send, Activity, Database, ShoppingBag, Copy, Users, RefreshCw, Search, Zap, Hexagon, LogIn, LogOut, Layers, History, ArrowUpRight, ArrowDownLeft, AlertTriangle, Sparkles, Rocket
 } from 'lucide-react';
 
-// 👇 DÒNG NÀY SẼ HẾT LỖI NẾU MEO ĐÃ LÀM BƯỚC 1 👇
+// 👇 Code này chạy trên máy Meo sẽ OK, còn ở đây báo lỗi kệ nó nhé! 👇
 import { UPDATE_HISTORY } from './data/updates';
 
 // --- CẤU HÌNH ---
-const CURRENT_VERSION = "v4.5";
+const CURRENT_VERSION = "v4.5"; // Nhớ tăng số này lên khi Meo cập nhật tính năng mới nha
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
 
 // --- FIREBASE SETUP ---
-// 👇 Config chính chủ của Meo đây 👇
+// 👇 Config chính chủ của Meo đã được điền sẵn 👇
 const firebaseConfig = {
   apiKey: "AIzaSyDrREROquKxOUFf8GfkkMeaALE929MJDRY",
   authDomain: "meo-coin-net.firebaseapp.com",
@@ -104,6 +104,7 @@ export default function MeoCoinNetwork() {
           stopMining(); 
         }
       } else {
+        // Tạo file version nếu chưa có
         setDoc(systemRef, { latestVersion: CURRENT_VERSION }, { merge: true });
       }
     });
@@ -145,6 +146,7 @@ export default function MeoCoinNetwork() {
       }
     });
 
+    // Lịch sử giao dịch
     const txQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), orderBy('timestamp', 'desc'), limit(50));
     onSnapshot(txQuery, (snap) => {
       const txs = [];
@@ -287,10 +289,7 @@ export default function MeoCoinNetwork() {
     try { await signInWithPopup(auth, googleProvider); } catch (e) { alert(e.message); }
   };
 
-  // ... (Phần Render UI giữ nguyên như cũ, chỉ cần copy phần trên là đủ) ...
-  // Để chắc chắn, Meo có thể copy lại toàn bộ phần Render UI từ lần trước nếu muốn
-  // Nhưng quan trọng nhất là phần import và config ở trên đầu file
-  
+  // --- GIAO DIỆN CHẶN NHIỀU TAB ---
   if (isDuplicateTab) {
     return (
       <div style={{height:'100vh', background:'#fee2e2', color:'#991b1b', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem'}}>
@@ -306,13 +305,10 @@ export default function MeoCoinNetwork() {
     );
   }
 
+  // --- GIAO DIỆN THÔNG BÁO UPDATE ---
   if (updateAvailable) {
     return (
       <div style={{height:'100vh', background:'linear-gradient(135deg, #f0abfc 0%, #a78bfa 100%)', color:'white', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem', position:'relative', overflow:'hidden'}}>
-        {/* Hiệu ứng nền */}
-        <div style={{position:'absolute', top:'-10%', left:'-10%', width:'300px', height:'300px', background:'rgba(255,255,255,0.2)', borderRadius:'50%', filter:'blur(50px)'}}></div>
-        <div style={{position:'absolute', bottom:'-10%', right:'-10%', width:'400px', height:'400px', background:'rgba(255,255,255,0.1)', borderRadius:'50%', filter:'blur(60px)'}}></div>
-        
         <div style={{background:'rgba(255,255,255,0.2)', backdropFilter:'blur(20px)', padding:'3rem', borderRadius:'30px', border:'1px solid rgba(255,255,255,0.3)', boxShadow:'0 20px 50px rgba(0,0,0,0.2)', maxWidth:'500px'}}>
           <Sparkles size={64} className="animate-pulse" style={{margin:'0 auto 1rem', color:'#fde047'}}/>
           <h1 style={{fontSize:'2.5rem', fontWeight:'800', marginBottom:'0.5rem', textShadow:'0 2px 10px rgba(0,0,0,0.1)'}}>Cập Nhật Mới! ✨</h1>
