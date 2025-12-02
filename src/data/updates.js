@@ -1,12 +1,18 @@
 // Đây là cuốn nhật ký hành trình của MeoCoin
 
 export const UPDATE_HISTORY = [
-    { version: "v4.9.1(Lastest)", 
-      date: "Vừa xong", 
-      title: "Bug Fixes 🛠️", 
-      desc: "Sửa lỗi hiển thị số block đã đào và căn giữa icon chân mèo trong máy đào.", 
-      color: "#ef4444" 
-    },
+  { version: "v4.9.2", 
+    date: "Vừa xong", 
+    title: "Trải Nghiệm Cập Nhật Mới 🎁", 
+    desc: "Nâng cấp giao diện thông báo cập nhật: Hiển thị chi tiết nội dung thay đổi ngay trên màn hình chào mừng. Tự động chuyển hướng đến Nhật Ký sau khi cập nhật.", 
+    color: "#d946ef" 
+  },
+  { version: "v4.9.1(Lastest)", 
+    date: "Vừa xong", 
+    title: "Bug Fixes 🛠️", 
+    desc: "Sửa lỗi hiển thị số block đã đào và căn giữa icon chân mèo trong máy đào.", 
+    color: "#ef4444" 
+  },
   { version: "v4.9 (New)",
     date: "Vừa xong",
     title: "Tab Tài Khoản Riêng 👤", 
