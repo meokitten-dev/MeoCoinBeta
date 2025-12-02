@@ -13,15 +13,16 @@ const db = getFirestore();
 const VERSION = 'meocoin-network-v4'; 
 const MAX_SUPPLY = 1000000;
 const BLOCK_REWARD = 10; 
-const COOLDOWN_MS = 5000; // 5 giây hồi chiêu
+const COOLDOWN_MS = 5000; 
 
 export default async function handler(req, res) {
+  // Lỗi Method thì vẫn phải báo lỗi thật
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { userId, minerName, userEmail, userPhoto } = req.body;
 
   if (!userId) {
-    return res.status(400).json({ error: 'Thiếu thông tin' });
+    return res.status(200).json({ success: false, message: 'Thiếu thông tin User' });
   }
 
   try {
@@ -33,7 +34,7 @@ export default async function handler(req, res) {
       const statsDoc = await t.get(statsRef);
       const currentSupply = statsDoc.exists ? (statsDoc.data().totalSupply || 0) : 0;
 
-      if (currentSupply + BLOCK_REWARD > MAX_SUPPLY) throw new Error("MAX_SUPPLY_REACHED");
+      if (currentSupply + BLOCK_REWARD > MAX_SUPPLY) throw new Error("MAX_SUPPLY");
 
       const userDoc = await t.get(userRef);
       const now = Date.now();
@@ -44,11 +45,10 @@ export default async function handler(req, res) {
         
         // Kiểm tra hồi chiêu
         if (now - lastMined < COOLDOWN_MS) {
-          throw new Error("COOLDOWN"); // Ném mã lỗi ngắn gọn để catch bên dưới
+          throw new Error("COOLDOWN");
         }
       }
 
-      // Logic tạo block (Fake chain)
       const latestSnapshot = await t.get(blocksRef.orderBy('index', 'desc').limit(1));
       let prevHash = "genesis-block";
       let newIndex = 1;
@@ -100,15 +100,16 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true });
 
   } catch (error) {
-    // Xử lý lỗi thông minh hơn để không spam 500
+    // 👇 MẸO Ở ĐÂY: Trả về 200 (Thành công) nhưng kèm cờ success: false
     if (error.message === "COOLDOWN") {
-        return res.status(429).json({ error: "⏳ Đào quá nhanh! Đợi 5s nhé." });
+        return res.status(200).json({ success: false, code: "COOLDOWN", message: "⏳ Đào quá nhanh! Chờ chút..." });
     }
-    if (error.message === "MAX_SUPPLY_REACHED") {
-        return res.status(400).json({ error: "⚠️ Đã hết coin để đào!" });
+    if (error.message === "MAX_SUPPLY") {
+        return res.status(200).json({ success: false, code: "MAX_SUPPLY", message: "⚠️ Đã hết coin!" });
     }
 
     console.error("Mining Error:", error);
-    return res.status(500).json({ error: "Lỗi hệ thống: " + error.message });
+    // Các lỗi hệ thống khác thì vẫn nên báo lỗi thật
+    return res.status(500).json({ success: false, message: "Lỗi hệ thống: " + error.message });
   }
 }

@@ -2,6 +2,13 @@
 
 export const UPDATE_HISTORY = [
   {
+    version: "v4.7 (Latest)",
+    date: "Vừa xong",
+    title: "Kiểm Tra Hệ Thống Update 📡",
+    desc: "Phiên bản này dùng để kiểm tra tính năng tự động thông báo cập nhật.",
+    color: "#8b5cf6" // Tím mộng mơ
+  },
+  {
     version: "v4.6 (New)",
     date: "Vừa xong",
     title: "Bảo Mật Real-time 🛡️",

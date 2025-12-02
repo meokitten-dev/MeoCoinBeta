@@ -28,7 +28,7 @@ import {
 import { UPDATE_HISTORY } from './data/updates';
 
 // --- CẤU HÌNH ---
-const CURRENT_VERSION = "v4.6"; 
+const CURRENT_VERSION = "v4.7"; 
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
 
@@ -233,20 +233,25 @@ export default function MeoCoinNetwork() {
           userPhoto: user.photoURL
         })
       });
+      
       const result = await response.json();
       
-      if (!response.ok) {
-        if (response.status === 429) {
-            addLog("⏳ Đào nhanh quá! Đợi xíu...", "error");
-        } else {
-            throw new Error(result.error || "Lỗi Server");
-        }
-      } else {
+      // 👇 LOGIC MỚI: Kiểm tra cờ success
+      if (result.success) {
         addLog(`🍯 +${BLOCK_REWARD} MeoCoin về túi!`, "success");
+      } else {
+        // Nếu Server bảo thất bại (do Cooldown), ta chỉ hiện log nhẹ nhàng
+        // KHÔNG ném Error -> KHÔNG có dòng đỏ trong Console
+        if (result.code === "COOLDOWN") {
+            addLog(result.message, "warning"); // Màu vàng cảnh báo thôi
+        } else {
+            addLog(`😿 ${result.message}`, "error");
+        }
       }
     } catch (e) { 
-      console.error("Mining Error:", e);
-      addLog(`😿 Lỗi: ${e.message}`, "error"); 
+      // Chỉ log những lỗi mạng thực sự (mất mạng, server sập)
+      console.error("Network Error:", e);
+      addLog(`🔌 Lỗi kết nối: ${e.message}`, "error"); 
     }
   };
 
