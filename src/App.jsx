@@ -27,6 +27,9 @@ import {
 
 import { UPDATE_HISTORY } from './data/updates';
 
+import { PawPrint, /*...*/ } from 'lucide-react';
+import CuteEffects from './components/CuteEffects';
+
 const CURRENT_VERSION = "v4.9.2"; 
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
@@ -357,6 +360,7 @@ export default function MeoCoinNetwork() {
 
   return (
     <div className="app-container">
+      <CuteEffects />
       <div className="sidebar">
         <div className="logo-area">
           <PawPrint className="animate-bounce" size={32} color="#d946ef"/>
@@ -552,34 +556,98 @@ export default function MeoCoinNetwork() {
 
           {/* TAB TÀI KHOẢN */}
           {activeTab === 'account' && (
-            <div className="wallet-screen">
-              <div className="card" style={{display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', gap:'1rem'}}>
-                <div style={{position:'relative'}}>
-                  <img src={user.photoURL} style={{width:'100px', height:'100px', borderRadius:'50%', border:'4px solid #fce7f3', boxShadow:'0 10px 20px rgba(236, 72, 153, 0.15)'}} />
-                  <div style={{position:'absolute', bottom:'0', right:'0', background:'#10b981', color:'white', borderRadius:'50%', padding:'5px', border:'2px solid white'}}><Zap size={16}/></div>
-                </div>
-                <div>
-                  <h2 style={{fontSize:'1.5rem', fontWeight:'800', color:'#334155'}}>{user.displayName}</h2>
-                  <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'0.5rem', color:'#64748b', fontSize:'0.9rem'}}>
-                    <Mail size={16}/> {user.email}
-                  </div>
-                </div>
-                <div style={{display:'flex', gap:'1rem', width:'100%', marginTop:'1rem'}}>
-                  <div style={{flex:1, background:'#f8fafc', padding:'1rem', borderRadius:'15px'}}>
-                    <div style={{fontSize:'0.8rem', color:'#94a3b8', fontWeight:'700'}}>ĐÃ ĐÀO</div>
-                    <div style={{fontSize:'1.2rem', color:'#d946ef', fontWeight:'800'}}>{myBlocksMined} Block</div>
-                  </div>
-                  <div style={{flex:1, background:'#f8fafc', padding:'1rem', borderRadius:'15px'}}>
-                    <div style={{fontSize:'0.8rem', color:'#94a3b8', fontWeight:'700'}}>LEVEL</div>
-                    <div style={{fontSize:'1.2rem', color:'#3b82f6', fontWeight:'800'}}>{currentLevel}</div>
-                  </div>
-                </div>
-                <button onClick={() => signOut(auth)} style={{background:'#fee2e2', color:'#ef4444', border:'none', padding:'1rem', borderRadius:'15px', cursor:'pointer', fontSize:'1rem', width: '100%', display:'flex', justifyContent:'center', gap:'0.5rem', fontWeight:'800', marginTop:'1rem'}}>
-                  <LogOut size={20}/> Đăng Xuất
-                </button>
-              </div>
-            </div>
-          )}
+  <div className="wallet-screen">
+    <div className="card" style={{display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', gap:'1.5rem'}}>
+      <div style={{position:'relative', marginBottom:'1.5rem'}}>
+        <img 
+          src={user.photoURL} 
+          style={{
+            width: '120px',
+            height: '120px',
+            borderRadius: '50%',
+            border: '4px solid #ffb6c1',
+            boxShadow: '0 10px 30px rgba(255, 182, 193, 0.3)',
+            position: 'relative',
+            zIndex: 2
+          }} 
+        />
+        <div style={{
+          position: 'absolute',
+          top: '-10px',
+          right: '-10px',
+          background: 'linear-gradient(135deg, #ffb6c1, #e6e6fa)',
+          color: 'white',
+          borderRadius: '50%',
+          padding: '10px',
+          border: '3px solid white',
+          boxShadow: '0 5px 15px rgba(255, 182, 193, 0.4)',
+          zIndex: 3,
+          animation: 'bounce 2s infinite'
+        }}>
+          <Zap size={24} />
+        </div>
+        <div style={{
+          position: 'absolute',
+          bottom: '-5px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'linear-gradient(135deg, #b2f2bb, #8dd7a0)',
+          color: 'white',
+          padding: '5px 15px',
+          borderRadius: '20px',
+          fontSize: '0.8rem',
+          fontWeight: '800',
+          boxShadow: '0 5px 15px rgba(178, 242, 187, 0.3)',
+          zIndex: 3
+        }}>
+          Cấp {currentLevel}
+        </div>
+      </div>
+      
+      <div>
+        <h2 style={{fontSize:'1.8rem', fontWeight:'900', color:'#777', marginBottom:'0.5rem'}}>{user.displayName}</h2>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap:'0.8rem', color:'#aaa', fontSize:'1rem'}}>
+          <Mail size={18}/> {user.email}
+        </div>
+      </div>
+      
+      <div style={{display:'flex', gap:'1.5rem', width:'100%', marginTop:'1rem'}}>
+        <div style={{flex:1, background:'rgba(255, 255, 255, 0.8)', padding:'1.2rem', borderRadius:'20px', border:'2px solid rgba(255, 182, 193, 0.3)'}}>
+          <div style={{fontSize:'0.9rem', color:'#ffb6c1', fontWeight:'800', marginBottom:'0.5rem'}}>ĐÃ ĐÀO</div>
+          <div style={{fontSize:'1.4rem', color:'#ff7f50', fontWeight:'900'}}>{myBlocksMined} Block</div>
+        </div>
+        <div style={{flex:1, background:'rgba(255, 255, 255, 0.8)', padding:'1.2rem', borderRadius:'20px', border:'2px solid rgba(255, 182, 193, 0.3)'}}>
+          <div style={{fontSize:'0.9rem', color:'#b2f2bb', fontWeight:'800', marginBottom:'0.5rem'}}>LEVEL</div>
+          <div style={{fontSize:'1.4rem', color:'#e6e6fa', fontWeight:'900'}}>{currentLevel}</div>
+        </div>
+      </div>
+      
+      <button onClick={() => signOut(auth)} style={{
+        background:'linear-gradient(135deg, #ff9aa2, #ff7b8a)',
+        color:'white',
+        border:'none',
+        padding:'1.2rem',
+        borderRadius:'18px',
+        cursor:'pointer',
+        fontSize:'1.1rem',
+        width: '100%',
+        display:'flex',
+        justifyContent:'center',
+        alignItems:'center',
+        gap:'0.8rem',
+        fontWeight:'800',
+        marginTop:'1.5rem',
+        boxShadow:'0 10px 25px rgba(255, 154, 162, 0.4)',
+        transition:'transform 0.3s'
+      }}
+      onMouseOver={(e) => e.target.style.transform = 'scale(1.05)'}
+      onMouseOut={(e) => e.target.style.transform = 'scale(1)'}
+      >
+        <LogOut size={22}/> Đăng Xuất
+      </button>
+    </div>
+  </div>
+)}
 
         </div>
       </div>
