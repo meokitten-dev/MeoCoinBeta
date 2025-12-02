@@ -27,7 +27,7 @@ import {
 
 import { UPDATE_HISTORY } from './data/updates';
 
-import { PawPrint, /*...*/ } from 'lucide-react';
+
 import CuteEffects from './components/CuteEffects';
 
 import './index.css'
