@@ -1,6 +1,5 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import crypto from 'crypto';
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || '{}');
 
@@ -15,27 +14,12 @@ const VERSION = 'meocoin-network-v4';
 const MAX_SUPPLY = 1000000;
 const BLOCK_REWARD = 10; 
 
-function calculateHash(prevHash, userId, nonce) {
-  const data = `${prevHash}${userId}${nonce}`;
-  return crypto.createHash('sha256').update(data).digest('hex');
-}
-
-function getDifficulty(currentSupply) {
-  if (currentSupply < 50000) return "0000"; 
-  if (currentSupply < 200000) return "00000";
-  if (currentSupply < 400000) return "00000";
-  if (currentSupply < 600000) return "000000";
-  if (currentSupply < 800000) return "000000";
-  return "0000000";
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // 👇 Lấy thêm thông tin user để tạo ví nếu cần
-  const { userId, nonce, clientHash, minerName, userEmail, userPhoto } = req.body;
+  const { userId, minerName, userEmail, userPhoto } = req.body;
 
-  if (!userId || !nonce || !clientHash) {
+  if (!userId) {
     return res.status(400).json({ error: 'Thiếu thông tin' });
   }
 
@@ -48,8 +32,10 @@ export default async function handler(req, res) {
       const statsDoc = await t.get(statsRef);
       const currentSupply = statsDoc.exists ? (statsDoc.data().totalSupply || 0) : 0;
 
+      // Kiểm tra còn coin không
       if (currentSupply + BLOCK_REWARD > MAX_SUPPLY) throw new Error("Đã hết coin để đào!");
 
+      // Lấy block cũ để tạo dây xích giả (cho đẹp đội hình)
       const latestSnapshot = await t.get(blocksRef.orderBy('index', 'desc').limit(1));
       let prevHash = "genesis-block";
       let newIndex = 1;
@@ -60,22 +46,19 @@ export default async function handler(req, res) {
         newIndex = latestBlock.index + 1;
       }
 
-      const serverCalculatedHash = calculateHash(prevHash, userId, nonce);
-      const requiredDiff = getDifficulty(currentSupply);
-
-      if (serverCalculatedHash !== clientHash) throw new Error("Hash không khớp!");
-      if (!serverCalculatedHash.startsWith(requiredDiff)) throw new Error(`Hash yếu! Cần bắt đầu bằng '${requiredDiff}'`);
+      // Tạo hash ngẫu nhiên (Fake hash)
+      const randomHash = '0000' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
       const userDoc = await t.get(userRef);
       
-      // 👇 LOGIC MỚI: Tự động tạo user nếu chưa có (Thay vì báo lỗi)
+      // Tự động tạo user nếu chưa có
       if (!userDoc.exists) {
         t.set(userRef, {
           address: userId,
           email: userEmail || "",
           displayName: minerName || "Miner",
           photoURL: userPhoto || "",
-          balance: BLOCK_REWARD, // Thưởng luôn block đầu tiên
+          balance: BLOCK_REWARD,
           blocksMined: 1,
           joinedAt: FieldValue.serverTimestamp(),
           lastSeen: FieldValue.serverTimestamp()
@@ -93,12 +76,11 @@ export default async function handler(req, res) {
       const newBlockId = `block_${Date.now()}`;
       t.set(blocksRef.doc(newBlockId), {
         index: newIndex,
-        hash: serverCalculatedHash,
+        hash: randomHash,
         prevHash: prevHash,
         miner: userId,
         minerName: minerName || "Unknown",
-        nonce: Number(nonce),
-        difficulty: requiredDiff,
+        difficulty: "SIMULATED",
         timestamp: FieldValue.serverTimestamp(),
         reward: BLOCK_REWARD
       });

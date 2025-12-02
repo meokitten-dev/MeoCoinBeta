@@ -29,7 +29,7 @@ const BLOCK_REWARD = 10;
 const MAX_SUPPLY = 1000000; 
 
 // --- FIREBASE SETUP ---
-// 👇 BƯỚC QUAN TRỌNG NHẤT: Meo điền thông tin vào đây nhé 👇
+// 👇 ĐIỀN CONFIG CỦA MEO VÀO ĐÂY NHA 👇
 const firebaseConfig = {
   apiKey: "AIzaSyDrREROquKxOUFf8GfkkMeaALE929MJDRY",
   authDomain: "meo-coin-net.firebaseapp.com",
@@ -45,13 +45,6 @@ const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 const appId = 'meocoin-network-v4'; 
 
-async function sha256(message) {
-  const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
 export default function MeoCoinNetwork() {
   const [user, setUser] = useState(null);
   const [balance, setBalance] = useState(0);
@@ -59,20 +52,18 @@ export default function MeoCoinNetwork() {
   const [blockchain, setBlockchain] = useState([]); 
   const [totalSupply, setTotalSupply] = useState(0); 
   const [mining, setMining] = useState(false);
-  const [hashRate, setHashRate] = useState(0);
+  const [hashRate, setHashRate] = useState(0); // Chỉ là số hiển thị cho vui
   const [logs, setLogs] = useState([]);
-  const [currentDifficulty, setCurrentDifficulty] = useState("0000"); 
+  const [currentLevel, setCurrentLevel] = useState(1); 
   const [activeTab, setActiveTab] = useState('miner');
   const [loading, setLoading] = useState(true);
   
-  // State cho chuyển tiền
+  // State chuyển tiền
   const [recipientId, setRecipientId] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [txStatus, setTxStatus] = useState(null);
 
-  const miningRef = useRef(false);
-  const nonceRef = useRef(0);
-  const latestBlockRef = useRef({ hash: "genesis-block", index: 0 });
+  const miningIntervalRef = useRef(null);
   const totalSupplyRef = useRef(0);
 
   // --- 1. AUTH & INIT ---
@@ -101,7 +92,6 @@ export default function MeoCoinNetwork() {
     onSnapshot(blocksQuery, (snap) => {
       const b = []; snap.forEach(d => b.push(d.data()));
       setBlockchain(b);
-      if (b.length > 0) latestBlockRef.current = { hash: b[0].hash, index: b[0].index };
     });
 
     const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'global');
@@ -110,19 +100,34 @@ export default function MeoCoinNetwork() {
         const supply = doc.data().totalSupply || 0;
         setTotalSupply(supply);
         totalSupplyRef.current = supply;
-        setCurrentDifficulty(calculateDifficulty(supply));
+        setCurrentLevel(calculateLevel(supply));
       }
     });
   }, [user]);
 
-  // --- 3. MINING ---
-  const calculateDifficulty = (currentSupply) => {
-    if (currentSupply < 50000) return "0000"; 
-    if (currentSupply < 200000) return "00000";
-    if (currentSupply < 400000) return "00000";
-    if (currentSupply < 600000) return "000000";
-    if (currentSupply < 800000) return "000000";
-    return "0000000";
+  // --- 3. SIMULATED MINING (GIẢ LẬP - SIÊU NHẸ) ---
+  
+  // Tính Level dựa trên Supply (Thay cho Difficulty)
+  const calculateLevel = (currentSupply) => {
+    if (currentSupply < 50000) return 1; 
+    if (currentSupply < 200000) return 2;
+    if (currentSupply < 400000) return 3;
+    if (currentSupply < 600000) return 4;
+    if (currentSupply < 800000) return 5;
+    return 6;
+  };
+
+  // Tính tỉ lệ trúng thưởng dựa trên Level (Càng cao càng khó trúng)
+  const getWinChance = (level) => {
+    switch(level) {
+      case 1: return 0.2;   // 20% mỗi giây (Dễ)
+      case 2: return 0.1;   // 10% mỗi giây
+      case 3: return 0.05;  // 5% mỗi giây
+      case 4: return 0.02;  // 2% mỗi giây
+      case 5: return 0.01;  // 1% mỗi giây
+      case 6: return 0.001; // 0.1% mỗi giây (Siêu khó)
+      default: return 0.01;
+    }
   };
 
   const addLog = (msg, type = 'info') => {
@@ -133,49 +138,47 @@ export default function MeoCoinNetwork() {
   const startMining = () => {
     if (totalSupplyRef.current >= MAX_SUPPLY) return addLog("Hết coin!", "error");
     if (mining) return;
+    
     setMining(true);
-    miningRef.current = true;
-    mineLoop();
-    addLog(`🚀 Bắt đầu! Level: ${calculateDifficulty(totalSupplyRef.current).length}`, "info");
+    addLog(`🚀 Hệ thống giả lập kích hoạt! Level: ${calculateLevel(totalSupplyRef.current)}`, "info");
+
+    // Dùng setInterval thay vì while(true) -> Không tốn CPU
+    miningIntervalRef.current = setInterval(async () => {
+      // 1. Tạo hiệu ứng Hashrate ảo cho vui mắt
+      const fakeHashRate = Math.floor(Math.random() * 500) + 1500; // 1500 - 2000 H/s ảo
+      setHashRate(fakeHashRate);
+
+      // 2. Quay xổ số xem có trúng block không
+      const level = calculateLevel(totalSupplyRef.current);
+      const chance = getWinChance(level);
+      const roll = Math.random(); // Ra số từ 0.0 đến 1.0
+
+      // Nếu trúng số
+      if (roll < chance) {
+        // Tạm dừng timer để xử lý (tránh spam server)
+        clearInterval(miningIntervalRef.current); 
+        
+        const fakeHash = "0000" + Math.random().toString(36).substring(7); // Hash ảo
+        addLog(`✨ MAY MẮN! Tìm thấy Block: ${fakeHash}...`, "success");
+        
+        await submitBlockToServer();
+        
+        // Chờ xíu rồi chạy tiếp
+        setTimeout(() => {
+           if(mining) startMining(); // Đệ quy gián tiếp để chạy lại
+        }, 2000);
+      } 
+    }, 1000); // Chạy mỗi 1 giây (Siêu nhẹ)
   };
 
   const stopMining = () => {
     setMining(false);
-    miningRef.current = false;
+    if (miningIntervalRef.current) clearInterval(miningIntervalRef.current);
     setHashRate(0);
-    addLog("🛑 Đã dừng.", "warning");
+    addLog("🛑 Đã tắt máy đào.", "warning");
   };
 
-  const mineLoop = async () => {
-    let hashes = 0;
-    const startTime = Date.now();
-    while (miningRef.current) {
-      nonceRef.current++;
-      const prevHash = latestBlockRef.current.hash;
-      const data = `${prevHash}${user.uid}${nonceRef.current}`;
-      const hash = await sha256(data);
-      hashes++;
-
-      const currentDiff = calculateDifficulty(totalSupplyRef.current);
-      if (hash.startsWith(currentDiff)) {
-        addLog(`✨ TÌM THẤY: ${hash.substring(0, 8)}...`, "success");
-        await submitBlockToServer(hash, nonceRef.current);
-        nonceRef.current += Math.floor(Math.random() * 100000);
-        await new Promise(r => setTimeout(r, 1000)); 
-      }
-
-      if (Date.now() - startTime > 1000) {
-        if (miningRef.current) {
-          setHashRate(hashes);
-          await new Promise(r => setTimeout(r, 0)); 
-          mineLoop(); 
-          return;
-        }
-      }
-    }
-  };
-
-  const submitBlockToServer = async (validHash, validNonce) => {
+  const submitBlockToServer = async () => {
     if (!user) return;
     try {
       const response = await fetch('/api/mine', {
@@ -183,8 +186,6 @@ export default function MeoCoinNetwork() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.uid,
-          nonce: validNonce,
-          clientHash: validHash,
           minerName: user.displayName,
           userEmail: user.email,
           userPhoto: user.photoURL
@@ -192,14 +193,14 @@ export default function MeoCoinNetwork() {
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Lỗi Server");
-      addLog(`💰 +${BLOCK_REWARD} MCN xác nhận!`, "success");
+      addLog(`💰 +${BLOCK_REWARD} MCN đã về ví!`, "success");
     } catch (e) { 
       console.error(e); 
-      addLog(`❌ Bị từ chối: ${e.message}`, "error"); 
+      addLog(`❌ Lỗi mạng: ${e.message}`, "error"); 
     }
   };
 
-  // --- 4. TÍNH NĂNG CHUYỂN TIỀN (ĐÃ MỞ LẠI VÀ DÙNG API) ---
+  // --- 4. TÍNH NĂNG CHUYỂN TIỀN ---
   const handleTransfer = async (e) => {
     e.preventDefault();
     setTxStatus(null);
@@ -209,9 +210,8 @@ export default function MeoCoinNetwork() {
     if (amount > balance) return setTxStatus({type: 'error', msg: 'Số dư không đủ'});
     if (recipientId === user.uid) return setTxStatus({type: 'error', msg: 'Không thể tự chuyển'});
 
-    setTxStatus({type: 'info', msg: 'Đang xử lý giao dịch an toàn...'});
+    setTxStatus({type: 'info', msg: 'Đang xử lý...'});
     try {
-      // Gọi API chuyển tiền thay vì tự chuyển
       const response = await fetch('/api/transfer', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -221,11 +221,9 @@ export default function MeoCoinNetwork() {
           amount: amount
         })
       });
-
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Lỗi giao dịch");
-
-      setTxStatus({type: 'success', msg: '✅ Chuyển tiền thành công!'});
+      setTxStatus({type: 'success', msg: '✅ Chuyển thành công!'});
       setSendAmount('');
       addLog(`💸 Đã chuyển ${amount} MCN.`, "info");
     } catch (error) { 
@@ -237,7 +235,7 @@ export default function MeoCoinNetwork() {
     try { await signInWithPopup(auth, googleProvider); } catch (e) { alert(e.message); }
   };
 
-  if (loading) return <div style={{height:'100vh', background:'#0a0a0a', color:'#22c55e', display:'flex', justifyContent:'center', alignItems:'center'}}>Loading V4... <RefreshCw className="animate-spin"/></div>;
+  if (loading) return <div style={{height:'100vh', background:'#0a0a0a', color:'#22c55e', display:'flex', justifyContent:'center', alignItems:'center'}}>Loading System... <RefreshCw className="animate-spin"/></div>;
 
   if (!user) return (
     <div style={{height:'100vh', background:'#0a0a0a', color:'#22c55e', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'2rem'}}>
@@ -262,7 +260,7 @@ export default function MeoCoinNetwork() {
         <nav className="nav-menu">
           <NavBtn active={activeTab==='miner'} onClick={()=>setActiveTab('miner')} icon={<Cpu size={18}/>} label="Trạm Đào" />
           <NavBtn active={activeTab==='wallet'} onClick={()=>setActiveTab('wallet')} icon={<Lock size={18}/>} label="Ví Tiền" />
-          <NavBtn active={activeTab==='explorer'} onClick={()=>setActiveTab('explorer')} icon={<Search size={18}/>} label="Blockchain" />
+          <NavBtn active={activeTab==='explorer'} onClick={()=>setActiveTab('explorer')} icon={<Search size={18}/>} label="Sổ Cái" />
         </nav>
         <div className="sidebar-footer">
           <div style={{display:'flex', alignItems:'center', gap:'0.5rem', marginBottom:'1rem'}}>
@@ -278,11 +276,11 @@ export default function MeoCoinNetwork() {
       <div className="main-content">
         <div className="top-bar">
            <StatBox label="Số Dư" value={`${balance} MCN`} icon={<Zap size={20} color="#facc15"/>} />
-           <StatBox label="Hashrate" value={`${hashRate} H/s`} icon={<Activity size={20} color={mining ? "#4ade80" : "#737373"}/>} />
+           <StatBox label="Hashrate (Ảo)" value={`~${hashRate} H/s`} icon={<Activity size={20} color={mining ? "#4ade80" : "#737373"}/>} />
            <div className="stat-box" style={{flex: 2, display:'block'}}>
               <div style={{display:'flex', justifyContent:'space-between', marginBottom:'0.2rem'}}>
                 <span className="stat-label">Tổng Cung</span>
-                <span className="stat-label">Level: {currentDifficulty.length} ({currentDifficulty})</span>
+                <span className="stat-label">Cấp độ: {currentLevel}</span>
               </div>
               <div style={{width:'100%', height:'8px', background:'#262626', borderRadius:'4px', overflow:'hidden'}}>
                 <div style={{width:`${supplyPercent}%`, height:'100%', background:'#3b82f6', transition:'width 0.5s'}}></div>
@@ -302,7 +300,7 @@ export default function MeoCoinNetwork() {
                   {mining ? 'MINING...' : 'IDLE'}
                 </div>
                 <div style={{fontSize:'0.7rem', color:'#737373', marginTop:'0.5rem'}}>
-                  Target: {currentDifficulty}...
+                  CPU Usage: &lt; 1% (Simulated)
                 </div>
               </div>
               <div style={{display:'flex', gap:'1rem'}}>
@@ -313,7 +311,7 @@ export default function MeoCoinNetwork() {
                 )}
               </div>
               <div className="console-log">
-                {logs.length === 0 && <div style={{color:'#525252'}}>System ready... Difficulty: {currentDifficulty}</div>}
+                {logs.length === 0 && <div style={{color:'#525252'}}>Hệ thống sẵn sàng...</div>}
                 {logs.map((log, i) => (
                   <div key={i} className={`log-item ${log.type === 'success' ? 'log-success' : log.type === 'error' ? 'log-error' : ''}`}>
                     {`> [${log.time}] ${log.msg}`}
@@ -332,7 +330,6 @@ export default function MeoCoinNetwork() {
                    <button onClick={() => navigator.clipboard.writeText(user.uid)} style={{background:'#262626', border:'1px solid #14532d', color:'#fff', padding:'0.5rem', borderRadius:'0.5rem', cursor:'pointer'}}><Copy/></button>
                  </div>
                </div>
-               {/* ĐÃ MỞ LẠI FORM CHUYỂN TIỀN */}
                <div className="card">
                  <h3 style={{marginBottom:'1rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Send size={18}/> Chuyển Khoản</h3>
                  <div className="input-group">
@@ -362,7 +359,7 @@ export default function MeoCoinNetwork() {
                          <div style={{fontSize:'0.6rem', color:'#fff', marginTop:'0.5rem'}}>{block.minerName}</div>
                       </div>
                     ))}
-                    {blockchain.length === 0 && <div style={{color:'#737373'}}>Chưa có block mới (V4 Reset)</div>}
+                    {blockchain.length === 0 && <div style={{color:'#737373'}}>Chưa có block mới</div>}
                  </div>
               </div>
               <div className="card table-container">
