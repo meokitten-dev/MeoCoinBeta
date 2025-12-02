@@ -1,8 +1,6 @@
 // Đây là cuốn nhật ký hành trình của MeoCoin
 
 export const UPDATE_HISTORY = [
-    { version: "v4.9.3 (Lasted)", date: "Vừa Xong", title: "Ổn Định Hệ Thống 🛠️", desc: "Khôi phục lại bản ổn định V4.9.2, Fix lỗi hiển thị số Block và căn giữa icon chân mèo. Xóa mã V5 gây lỗi.", color: "#8b5cf6" },
-
   { version: "v4.9.2", 
     date: "02-12-2025", 
     title: "Trải Nghiệm Cập Nhật Mới 🎁", 

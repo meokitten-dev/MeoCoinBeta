@@ -13,15 +13,15 @@ const db = getFirestore();
 const VERSION = 'meocoin-network-v4'; 
 const MAX_SUPPLY = 1000000;
 const BLOCK_REWARD = 10; 
-const COOLDOWN_MS = 5000; // 5 giây hồi chiêu
+const COOLDOWN_MS = 5000; 
 
 export default async function handler(req, res) {
+  // Lỗi Method thì vẫn phải báo lỗi thật
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { userId, minerName, userEmail, userPhoto } = req.body;
 
   if (!userId) {
-    // Trả về 200 để Client không bị lỗi đỏ
     return res.status(200).json({ success: false, message: 'Thiếu thông tin User' });
   }
 
@@ -39,36 +39,46 @@ export default async function handler(req, res) {
       const userDoc = await t.get(userRef);
       const now = Date.now();
 
-      // Kiểm tra hồi chiêu 5 giây
       if (userDoc.exists) {
         const userData = userDoc.data();
         const lastMined = userData.lastMinedAt ? userData.lastMinedAt.toMillis() : 0;
         
+        // Kiểm tra hồi chiêu
         if (now - lastMined < COOLDOWN_MS) {
           throw new Error("COOLDOWN");
         }
       }
 
-      // Logic Block mới
       const latestSnapshot = await t.get(blocksRef.orderBy('index', 'desc').limit(1));
       let prevHash = "genesis-block";
       let newIndex = 1;
+      
       if (!latestSnapshot.empty) {
         const latestBlock = latestSnapshot.docs[0].data();
         prevHash = latestBlock.hash;
         newIndex = latestBlock.index + 1;
       }
+
       const randomHash = '0000' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
-      // Cập nhật hoặc tạo mới User
       if (!userDoc.exists) {
         t.set(userRef, {
-          address: userId, email: userEmail || "", displayName: minerName || "Miner", photoURL: userPhoto || "",
-          balance: BLOCK_REWARD, blocksMined: 1, joinedAt: FieldValue.serverTimestamp(), lastSeen: FieldValue.serverTimestamp(), lastMinedAt: FieldValue.serverTimestamp()
+          address: userId,
+          email: userEmail || "",
+          displayName: minerName || "Miner",
+          photoURL: userPhoto || "",
+          balance: BLOCK_REWARD,
+          blocksMined: 1,
+          joinedAt: FieldValue.serverTimestamp(),
+          lastSeen: FieldValue.serverTimestamp(),
+          lastMinedAt: FieldValue.serverTimestamp()
         });
       } else {
         t.update(userRef, {
-          balance: FieldValue.increment(BLOCK_REWARD), blocksMined: FieldValue.increment(1), lastSeen: FieldValue.serverTimestamp(), lastMinedAt: FieldValue.serverTimestamp()
+          balance: FieldValue.increment(BLOCK_REWARD),
+          blocksMined: FieldValue.increment(1),
+          lastSeen: FieldValue.serverTimestamp(),
+          lastMinedAt: FieldValue.serverTimestamp()
         });
       }
 
@@ -76,14 +86,21 @@ export default async function handler(req, res) {
 
       const newBlockId = `block_${Date.now()}`;
       t.set(blocksRef.doc(newBlockId), {
-        index: newIndex, hash: randomHash, prevHash: prevHash, miner: userId, minerName: minerName || "Unknown", difficulty: "SIMULATED",
-        timestamp: FieldValue.serverTimestamp(), reward: BLOCK_REWARD
+        index: newIndex,
+        hash: randomHash,
+        prevHash: prevHash,
+        miner: userId,
+        minerName: minerName || "Unknown",
+        difficulty: "SIMULATED",
+        timestamp: FieldValue.serverTimestamp(),
+        reward: BLOCK_REWARD
       });
     });
 
     return res.status(200).json({ success: true });
 
   } catch (error) {
+    // 👇 MẸO Ở ĐÂY: Trả về 200 (Thành công) nhưng kèm cờ success: false
     if (error.message === "COOLDOWN") {
         return res.status(200).json({ success: false, code: "COOLDOWN", message: "⏳ Đào quá nhanh! Chờ chút..." });
     }
@@ -92,7 +109,7 @@ export default async function handler(req, res) {
     }
 
     console.error("Mining Error:", error);
-    // Các lỗi hệ thống khác thì vẫn nên báo lỗi 500 thật
+    // Các lỗi hệ thống khác thì vẫn nên báo lỗi thật
     return res.status(500).json({ success: false, message: "Lỗi hệ thống: " + error.message });
   }
 }
