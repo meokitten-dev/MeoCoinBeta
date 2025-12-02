@@ -1,55 +1,60 @@
 // Đây là cuốn nhật ký hành trình của MeoCoin
 
 export const UPDATE_HISTORY = [
+  { version: "v5.0", 
+    date: "Vừa Xong", 
+    title: "Kỷ Nguyên Khám Phá 💎", 
+    desc: "Ra mắt hệ thống Khảo Cổ, Cửa Hàng và Bộ Sưu Tập. Đào ra vật phẩm thay vì chỉ coin!", 
+    color: "#8b5cf6" },
   { version: "v4.9.2", 
-    date: "Vừa xong", 
+    date: "02-12-2025", 
     title: "Trải Nghiệm Cập Nhật Mới 🎁", 
     desc: "Nâng cấp giao diện thông báo cập nhật: Hiển thị chi tiết nội dung thay đổi ngay trên màn hình chào mừng. Tự động chuyển hướng đến Nhật Ký sau khi cập nhật.", 
     color: "#d946ef" 
   },
-  { version: "v4.9.1(Lastest)", 
-    date: "Vừa xong", 
+  { version: "v4.9.1", 
+    date: "02-12-2025", 
     title: "Bug Fixes 🛠️", 
     desc: "Sửa lỗi hiển thị số block đã đào và căn giữa icon chân mèo trong máy đào.", 
     color: "#ef4444" 
   },
-  { version: "v4.9 (New)",
-    date: "Vừa xong",
+  { version: "v4.9",
+    date: "02-12-2025",
     title: "Tab Tài Khoản Riêng 👤", 
     desc: "Tách phần thông tin cá nhân và đăng xuất sang tab riêng trên Mobile cho thoáng.", 
     color: "#8b5cf6" 
   },
   {
-    version: "v4.8 (New)",
-    date: "Vừa xong",
+    version: "v4.8",
+    date: "02-12-2025",
     title: "Mobile Header Profile 👤",
     desc: "Đã hiện lại Avatar và nút Đăng xuất ngay trên giao diện điện thoại. Tối ưu lại bố cục mobile.",
     color: "#3b82f6"
   },
   {
-    version: "v4.7 (New)",
-    date: "Vừa xong",
+    version: "v4.7",
+    date: "02-12-2025",
     title: "Mobile UI & Session Fix 📱",
     desc: "Sửa lỗi giao diện mất menu trên điện thoại và lỗi đăng nhập 2 nơi.",
     color: "#10b981"
   },
   {
-    version: "v4.6 (New)",
-    date: "Vừa xong",
+    version: "v4.6",
+    date: "02-12-2025",
     title: "Bảo Mật Real-time 🛡️",
     desc: "Tính năng 'Kick-out'. Nếu tài khoản đăng nhập ở nơi khác, thiết bị cũ sẽ tự động bị đăng xuất để bảo vệ ví.",
     color: "#ea580c"
   },
   {
-    version: "v4.5 (New)",
-    date: "Vừa xong",
+    version: "v4.5",
+    date: "02-12-2025",
     title: "Hệ Thống Thông Báo Update 🔔",
     desc: "Tính năng tự động nhắc nhở người chơi reset trang khi có phiên bản mới.",
     color: "#f43f5e"
   },
   {
-    version: "v4.4 (New)",
-    date: "Vừa xong",
+    version: "v4.4",
+    date: "02-12-2025",
     title: "Chế Độ Đơn Nhiệm & Tối Ưu Log 🚀",
     desc: "Ngăn chặn việc mở nhiều tab cùng lúc để bảo vệ dữ liệu. Làm sạch Console, ẩn các lỗi kỹ thuật không cần thiết.",
     color: "#f43f5e"
