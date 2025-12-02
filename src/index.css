@@ -131,7 +131,8 @@ body {
 .miner-screen { display: flex; flex-direction: column; align-items: center; max-width: 600px; margin: 0 auto; }
 .miner-circle {
   width: 280px; height: 280px; border-radius: 50%; background: white;
-  display: flex; flex-direction: column; justifyContent: center; align-items: center;
+  /* 👇 ĐÃ SỬA LẠI: Căn giữa theo chiều dọc */
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
   margin-bottom: 2.5rem; border: 8px solid #fce7f3; 
   box-shadow: 0 10px 30px rgba(236, 72, 153, 0.15); transition: all 0.3s;
 }

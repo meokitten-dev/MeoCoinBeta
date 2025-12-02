@@ -25,10 +25,9 @@ import {
   PawPrint, Wifi, Send, Activity, Database, ShoppingBag, Copy, Users, RefreshCw, Search, Zap, Hexagon, LogIn, LogOut, Layers, History, ArrowUpRight, ArrowDownLeft, AlertTriangle, Sparkles, Rocket, UserCog, Mail
 } from 'lucide-react';
 
-// 👇 DỮ LIỆU 
 import { UPDATE_HISTORY } from './data/updates';
 
-const CURRENT_VERSION = "v4.9"; 
+const CURRENT_VERSION = "v4.9.1"; 
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
 
@@ -70,6 +69,9 @@ export default function MeoCoinNetwork() {
   const [isSessionInvalid, setIsSessionInvalid] = useState(false); 
   const [updateAvailable, setUpdateAvailable] = useState(false); 
   const [isSessionReady, setIsSessionReady] = useState(false);
+  
+  // 👇 THÊM STATE ĐỂ LƯU SỐ BLOCK CỦA CHÍNH MÌNH
+  const [myBlocksMined, setMyBlocksMined] = useState(0);
 
   const localSessionIdRef = useRef(null);
   const miningIntervalRef = useRef(null);
@@ -138,6 +140,8 @@ export default function MeoCoinNetwork() {
       if (doc.exists()) {
         const data = doc.data();
         setBalance(data.balance || 0);
+        // 👇 LẤY SỐ BLOCK ĐÃ ĐÀO TỪ DB
+        setMyBlocksMined(data.blocksMined || 0);
         if (localSessionIdRef.current && data.currentSessionId && data.currentSessionId !== localSessionIdRef.current) {
           setIsSessionInvalid(true);
           stopMining();
@@ -305,7 +309,7 @@ export default function MeoCoinNetwork() {
           <NavBtn active={activeTab==='miner'} onClick={()=>setActiveTab('miner')} icon={<Zap size={20}/>} label="Nông Trại" />
           <NavBtn active={activeTab==='wallet'} onClick={()=>setActiveTab('wallet')} icon={<ShoppingBag size={20}/>} label="Ví Tiền" />
           <NavBtn active={activeTab==='explorer'} onClick={()=>setActiveTab('explorer')} icon={<Search size={20}/>} label="Sổ Cái" />
-          {/* 👇 THÊM TAB TÀI KHOẢN 👇 */}
+          {/* 👇 TAB TÀI KHOẢN 👇 */}
           <NavBtn active={activeTab==='account'} onClick={()=>setActiveTab('account')} icon={<UserCog size={20}/>} label="Tài Khoản" />
           <NavBtn active={activeTab==='updates'} onClick={()=>setActiveTab('updates')} icon={<History size={20}/>} label="Nhật Ký" />
         </nav>
@@ -506,7 +510,8 @@ export default function MeoCoinNetwork() {
                 <div style={{display:'flex', gap:'1rem', width:'100%', marginTop:'1rem'}}>
                   <div style={{flex:1, background:'#f8fafc', padding:'1rem', borderRadius:'15px'}}>
                     <div style={{fontSize:'0.8rem', color:'#94a3b8', fontWeight:'700'}}>ĐÃ ĐÀO</div>
-                    <div style={{fontSize:'1.2rem', color:'#d946ef', fontWeight:'800'}}>{user.blocksMined || 0} Block</div>
+                    {/* 👇 SỬA LẠI ĐỂ HIỂN THỊ ĐÚNG SỐ BLOCK 👇 */}
+                    <div style={{fontSize:'1.2rem', color:'#d946ef', fontWeight:'800'}}>{myBlocksMined} Block</div>
                   </div>
                   <div style={{flex:1, background:'#f8fafc', padding:'1rem', borderRadius:'15px'}}>
                     <div style={{fontSize:'0.8rem', color:'#94a3b8', fontWeight:'700'}}>LEVEL</div>
