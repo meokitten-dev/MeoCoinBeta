@@ -22,12 +22,51 @@ import {
 } from 'firebase/firestore';
 import { 
   // Import icon mới siêu cute
-  PawPrint, Wifi, Send, Activity, Database, ShoppingBag, Copy, Users, RefreshCw, Search, Zap, Hexagon, LogIn, LogOut, Layers
+  PawPrint, Wifi, Send, Activity, Database, ShoppingBag, Copy, Users, RefreshCw, Search, Zap, Hexagon, LogIn, LogOut, Layers, History
 } from 'lucide-react';
 
 // --- CẤU HÌNH ---
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
+
+// --- DỮ LIỆU LỊCH SỬ UPDATE ---
+const UPDATE_HISTORY = [
+  {
+    version: "v4.2 (New)",
+    date: "Hôm nay",
+    title: "Giao diện Wonderland 🌸",
+    desc: "Lột xác hoàn toàn với giao diện màu pastel siêu cute, icon chân mèo và hiệu ứng kính mờ (Glassmorphism).",
+    color: "#d946ef"
+  },
+  {
+    version: "v4.0",
+    date: "Hôm qua",
+    title: "Cơ chế Bảo Mật Server 🛡️",
+    desc: "Chuyển toàn bộ logic đào và cộng tiền lên Server API. Chặn đứng các tool hack speed và hack số dư. Thêm hồi chiêu 5s.",
+    color: "#8b5cf6"
+  },
+  {
+    version: "v3.0",
+    date: "Tuần trước",
+    title: "Blockchain Mini & Tổng Cung 🔗",
+    desc: "Tích hợp chuỗi khối hiển thị Hash thực tế. Giới hạn tổng cung 1 triệu coin để tạo sự khan hiếm.",
+    color: "#3b82f6"
+  },
+  {
+    version: "v2.0",
+    date: "Tháng trước",
+    title: "Mạng Lưới P2P & Ví Tiền 💼",
+    desc: "Cho phép nhiều người cùng tham gia mạng lưới. Ra mắt tính năng chuyển tiền qua lại giữa các ví.",
+    color: "#10b981"
+  },
+  {
+    version: "v1.0",
+    date: "Khởi thủy",
+    title: "MeoCoin Ra Đời 🐣",
+    desc: "Phiên bản sơ khai chạy trên trình duyệt. Đánh dấu sự ra đời của đế chế MeoCoin.",
+    color: "#f59e0b"
+  }
+];
 
 // --- FIREBASE SETUP ---
 // 👇 BƯỚC QUAN TRỌNG: Meo điền thông tin của Meo vào đây nhé 👇
@@ -259,6 +298,7 @@ export default function MeoCoinNetwork() {
           <NavBtn active={activeTab==='miner'} onClick={()=>setActiveTab('miner')} icon={<Zap size={20}/>} label="Nông Trại Mèo" />
           <NavBtn active={activeTab==='wallet'} onClick={()=>setActiveTab('wallet')} icon={<ShoppingBag size={20}/>} label="Túi Thần Kỳ" />
           <NavBtn active={activeTab==='explorer'} onClick={()=>setActiveTab('explorer')} icon={<Search size={20}/>} label="Sổ Cái Mèo" />
+          <NavBtn active={activeTab==='updates'} onClick={()=>setActiveTab('updates')} icon={<History size={20}/>} label="Nhật Ký Update" />
         </nav>
         <div className="sidebar-footer">
           <div style={{display:'flex', alignItems:'center', gap:'0.8rem', marginBottom:'1rem'}}>
@@ -383,6 +423,27 @@ export default function MeoCoinNetwork() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* TAB LỊCH SỬ UPDATE MỚI CÓNG */}
+          {activeTab === 'updates' && (
+            <div className="explorer-grid">
+               <div className="card" style={{gridColumn: '1 / -1'}}>
+                  <div style={{marginBottom:'1.5rem', fontWeight:'800', color:'#d946ef', display:'flex', alignItems:'center', gap:'0.8rem', fontSize:'1.2rem'}}>
+                    <History size={24}/> Nhật Ký Phát Triển
+                  </div>
+                  <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
+                    {UPDATE_HISTORY.map((update, index) => (
+                      <div key={index} style={{borderLeft:'4px solid #e2e8f0', paddingLeft:'1.5rem', position:'relative'}}>
+                        <div style={{position:'absolute', left:'-9px', top:'0', width:'14px', height:'14px', borderRadius:'50%', background: index===0 ? '#d946ef' : '#cbd5e1'}}></div>
+                        <div style={{fontWeight:'700', color:'#334155', fontSize:'1.1rem'}}>{update.version} <span style={{fontSize:'0.8rem', color:'#94a3b8', fontWeight:'500'}}>{update.date}</span></div>
+                        <div style={{fontSize:'0.9rem', color:'#f59e0b', fontWeight:'700', margin:'0.2rem 0'}}>{update.title}</div>
+                        <div style={{color:'#64748b', marginTop:'0.2rem', lineHeight:'1.6', fontSize:'0.9rem'}}>{update.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+               </div>
             </div>
           )}
         </div>
