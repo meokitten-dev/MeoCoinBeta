@@ -24,16 +24,14 @@ import {
   PawPrint, Wifi, Send, Activity, Database, ShoppingBag, Copy, Users, RefreshCw, Search, Zap, Hexagon, LogIn, LogOut, Layers, History, ArrowUpRight, ArrowDownLeft, AlertTriangle, Sparkles, Rocket
 } from 'lucide-react';
 
-// 👇 DÒNG NÀY ĐÚNG RỒI NHA MEO (Chỉ lỗi ở Preview của Mira thôi) 👇
+
 import { UPDATE_HISTORY } from './data/updates';
 
-// --- CẤU HÌNH ---
 const CURRENT_VERSION = "v4.7"; 
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
 
-// --- FIREBASE SETUP ---
-// 👇 Config chính chủ của Meo 👇
+// 👇 ĐIỀN CONFIG CỦA MEO VÀO ĐÂY 👇
 const firebaseConfig = {
   apiKey: "AIzaSyDrREROquKxOUFf8GfkkMeaALE929MJDRY",
   authDomain: "meo-coin-net.firebaseapp.com",
@@ -62,21 +60,24 @@ export default function MeoCoinNetwork() {
   const [activeTab, setActiveTab] = useState('miner');
   const [loading, setLoading] = useState(true);
   
-  // State Ví
   const [recipientId, setRecipientId] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [txStatus, setTxStatus] = useState(null);
   const [myTransactions, setMyTransactions] = useState([]); 
 
-  // State chặn nhiều tab & Update
   const [isDuplicateTab, setIsDuplicateTab] = useState(false);
+  const [isSessionInvalid, setIsSessionInvalid] = useState(false); 
   const [updateAvailable, setUpdateAvailable] = useState(false); 
+  
+  // 👇 CỜ MỚI: Chỉ khi session sẵn sàng mới bắt đầu sync
+  const [isSessionReady, setIsSessionReady] = useState(false);
+  const localSessionIdRef = useRef(null);
 
   const miningIntervalRef = useRef(null);
   const isSubmittingRef = useRef(false);
   const totalSupplyRef = useRef(0);
 
-  // --- 1. AUTH & SYSTEM CHECK ---
+  // --- 1. AUTH & SESSION INIT ---
   useEffect(() => {
     const channel = new BroadcastChannel('meocoin_channel');
     channel.postMessage({ type: 'NEW_TAB_OPENED' });
@@ -88,10 +89,32 @@ export default function MeoCoinNetwork() {
     };
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
+      if (currentUser) {
+        // 👇 QUY TRÌNH CHUẨN: Lấy Session ID TRƯỚC -> setUser SAU
+        try {
+          const res = await fetch('/api/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUser.uid })
+          });
+          const data = await res.json();
+          if (data.sessionId) {
+            localSessionIdRef.current = data.sessionId;
+            console.log("✅ Session ID mới:", data.sessionId);
+            setIsSessionReady(true); // Bật đèn xanh
+          }
+        } catch (e) {
+          console.error("Lỗi Session:", e);
+        }
+        setUser(currentUser); // Lúc này user vào nhưng session có thể chưa xong
+      } else {
+        setUser(null);
+        setIsSessionReady(false);
+      }
       setLoading(false);
     });
 
+    // Check Version
     const systemRef = doc(db, 'artifacts', appId, 'public', 'data', 'system', 'info');
     const unsubscribeSystem = onSnapshot(systemRef, (doc) => {
       if (doc.exists()) {
@@ -112,28 +135,45 @@ export default function MeoCoinNetwork() {
     };
   }, []);
 
-  // --- 2. DATA SYNC ---
+  // --- 2. DATA SYNC & REAL-TIME SECURITY ---
   useEffect(() => {
-    if (!user || isDuplicateTab || updateAvailable) return; 
+    // 👇 THÊM ĐIỀU KIỆN: Phải có Session Ready mới chạy sync
+    if (!user || isDuplicateTab || updateAvailable || isSessionInvalid || !isSessionReady) return; 
     
+    console.log("🛡️ Bắt đầu giám sát bảo mật với Session:", localSessionIdRef.current);
+
     const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
-    onSnapshot(userRef, (doc) => { if (doc.exists()) setBalance(doc.data().balance || 0); });
+    const unsubUser = onSnapshot(userRef, (doc) => { 
+      if (doc.exists()) {
+        const data = doc.data();
+        setBalance(data.balance || 0);
+
+        // CHECK KICK-OUT
+        if (localSessionIdRef.current && data.currentSessionId) {
+          if (data.currentSessionId !== localSessionIdRef.current) {
+            console.warn("🚫 PHÁT HIỆN ĐĂNG NHẬP NƠI KHÁC!");
+            setIsSessionInvalid(true);
+            stopMining();
+          }
+        }
+      }
+    });
 
     const usersCol = collection(db, 'artifacts', appId, 'public', 'data', 'users');
-    onSnapshot(usersCol, (snap) => {
+    const unsubUsers = onSnapshot(usersCol, (snap) => {
       const u = []; snap.forEach(d => u.push(d.data()));
       u.sort((a, b) => (b.balance || 0) - (a.balance || 0));
       setNetworkUsers(u);
     });
 
     const blocksQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'blocks'), orderBy('index', 'desc'), limit(10));
-    onSnapshot(blocksQuery, (snap) => {
+    const unsubBlocks = onSnapshot(blocksQuery, (snap) => {
       const b = []; snap.forEach(d => b.push(d.data()));
       setBlockchain(b);
     });
 
     const statsRef = doc(db, 'artifacts', appId, 'public', 'data', 'stats', 'global');
-    onSnapshot(statsRef, (doc) => {
+    const unsubStats = onSnapshot(statsRef, (doc) => {
       if (doc.exists()) {
         const supply = doc.data().totalSupply || 0;
         setTotalSupply(supply);
@@ -143,7 +183,7 @@ export default function MeoCoinNetwork() {
     });
 
     const txQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), orderBy('timestamp', 'desc'), limit(50));
-    onSnapshot(txQuery, (snap) => {
+    const unsubTx = onSnapshot(txQuery, (snap) => {
       const txs = [];
       snap.forEach(doc => {
         const data = doc.data();
@@ -154,8 +194,16 @@ export default function MeoCoinNetwork() {
       setMyTransactions(txs);
     });
 
-  }, [user, isDuplicateTab, updateAvailable]);
+    return () => {
+      unsubUser(); unsubUsers(); unsubBlocks(); unsubStats(); unsubTx();
+    };
 
+  }, [user, isDuplicateTab, updateAvailable, isSessionInvalid, isSessionReady]); // Thêm dependency isSessionReady
+
+  // ... (PHẦN LOGIC ĐÀO & UI GIỮ NGUYÊN NHƯ CŨ - CHỈ COPY LẠI THÔI) ...
+  // Để tiết kiệm không gian chat, Meo copy lại phần MINING và RENDER UI từ file cũ nha!
+  // Hoặc nếu Meo cần Mira gửi full 100% file này thì bảo Mira nhé.
+  
   // --- 3. MINING ---
   const calculateLevel = (currentSupply) => {
     if (currentSupply < 50000) return 1; 
@@ -184,7 +232,7 @@ export default function MeoCoinNetwork() {
   };
 
   const startMining = () => {
-    if (isDuplicateTab || updateAvailable) return; 
+    if (isDuplicateTab || updateAvailable || isSessionInvalid) return; 
     if (totalSupplyRef.current >= MAX_SUPPLY) return addLog("Hết coin rồi Meo ơi!", "error");
     if (mining) return;
     
@@ -193,7 +241,7 @@ export default function MeoCoinNetwork() {
     addLog(`🌸 Đã bật máy đào! Cấp độ: ${calculateLevel(totalSupplyRef.current)}`, "info");
 
     miningIntervalRef.current = setInterval(async () => {
-      if (isSubmittingRef.current || isDuplicateTab || updateAvailable) return; 
+      if (isSubmittingRef.current || isDuplicateTab || updateAvailable || isSessionInvalid) return; 
 
       const fakeHashRate = Math.floor(Math.random() * 500) + 1500; 
       setHashRate(fakeHashRate);
@@ -217,7 +265,7 @@ export default function MeoCoinNetwork() {
     if (miningIntervalRef.current) clearInterval(miningIntervalRef.current);
     isSubmittingRef.current = false;
     setHashRate(0);
-    if (!isDuplicateTab && !updateAvailable) addLog("💤 Meo đi ngủ đây...", "warning");
+    if (!isDuplicateTab && !updateAvailable && !isSessionInvalid) addLog("💤 Meo đi ngủ đây...", "warning");
   };
 
   const submitBlockToServer = async () => {
@@ -233,25 +281,20 @@ export default function MeoCoinNetwork() {
           userPhoto: user.photoURL
         })
       });
-      
       const result = await response.json();
       
-      // 👇 LOGIC MỚI: Kiểm tra cờ success
-      if (result.success) {
-        addLog(`🍯 +${BLOCK_REWARD} MeoCoin về túi!`, "success");
-      } else {
-        // Nếu Server bảo thất bại (do Cooldown), ta chỉ hiện log nhẹ nhàng
-        // KHÔNG ném Error -> KHÔNG có dòng đỏ trong Console
-        if (result.code === "COOLDOWN") {
-            addLog(result.message, "warning"); // Màu vàng cảnh báo thôi
+      if (!response.ok) {
+        if (response.status === 429) {
+            addLog("⏳ Đào nhanh quá! Đợi xíu...", "error");
         } else {
-            addLog(`😿 ${result.message}`, "error");
+            throw new Error(result.error || "Lỗi Server");
         }
+      } else {
+        addLog(`🍯 +${BLOCK_REWARD} MeoCoin về túi!`, "success");
       }
     } catch (e) { 
-      // Chỉ log những lỗi mạng thực sự (mất mạng, server sập)
-      console.error("Network Error:", e);
-      addLog(`🔌 Lỗi kết nối: ${e.message}`, "error"); 
+      console.error("Mining Error:", e);
+      addLog(`😿 Lỗi: ${e.message}`, "error"); 
     }
   };
 
@@ -289,7 +332,23 @@ export default function MeoCoinNetwork() {
     try { await signInWithPopup(auth, googleProvider); } catch (e) { alert(e.message); }
   };
 
-  // ... (Giao diện hiển thị giữ nguyên) ...
+  // --- GIAO DIỆN BỊ ĐĂNG XUẤT (KICKED OUT) ---
+  if (isSessionInvalid) {
+    return (
+      <div style={{height:'100vh', background:'#1e293b', color:'#f87171', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem'}}>
+        <ShieldAlert size={80} className="animate-pulse"/>
+        <div>
+          <h1 style={{fontSize:'2rem', fontWeight:'bold', marginBottom:'0.5rem'}}>Tài khoản đã đăng nhập nơi khác!</h1>
+          <p style={{color:'#94a3b8'}}>Để bảo mật, phiên đăng nhập này đã bị hủy.</p>
+        </div>
+        <button onClick={() => window.location.reload()} style={{background:'#ef4444', color:'white', border:'none', padding:'1rem 3rem', borderRadius:'50px', cursor:'pointer', fontWeight:'bold', fontSize:'1.1rem', boxShadow:'0 10px 25px rgba(239, 68, 68, 0.3)'}}>
+          Đăng nhập lại tại đây
+        </button>
+      </div>
+    );
+  }
+
+  // --- GIAO DIỆN CHẶN NHIỀU TAB ---
   if (isDuplicateTab) {
     return (
       <div style={{height:'100vh', background:'#fee2e2', color:'#991b1b', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem'}}>
