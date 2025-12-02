@@ -30,6 +30,8 @@ import { UPDATE_HISTORY } from './data/updates';
 import { PawPrint, /*...*/ } from 'lucide-react';
 import CuteEffects from './components/CuteEffects';
 
+import './index.css'
+
 const CURRENT_VERSION = "v4.9.2"; 
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
