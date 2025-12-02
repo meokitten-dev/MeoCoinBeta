@@ -32,12 +32,12 @@ const MAX_SUPPLY = 1000000;
 // --- FIREBASE SETUP ---
 // 👇 BƯỚC QUAN TRỌNG: Meo điền thông tin của Meo vào đây nhé 👇
 const firebaseConfig = {
-  apiKey: "DÁN_API_KEY_CỦA_MEO_VÀO_ĐÂY",
-  authDomain: "DÁN_AUTH_DOMAIN_VÀO_ĐÂY",
-  projectId: "DÁN_PROJECT_ID_VÀO_ĐÂY",
-  storageBucket: "DÁN_STORAGE_BUCKET_VÀO_ĐÂY",
-  messagingSenderId: "DÁN_MESSAGING_SENDER_ID_VÀO_ĐÂY",
-  appId: "DÁN_APP_ID_VÀO_ĐÂY"
+  apiKey: "AIzaSyDrREROquKxOUFf8GfkkMeaALE929MJDRY",
+  authDomain: "meo-coin-net.firebaseapp.com",
+  projectId: "meo-coin-net",
+  storageBucket: "meo-coin-net.firebasestorage.app",
+  messagingSenderId: "980010880222",
+  appId: "1:980010880222:web:3b195b6791e95d52f9464f"
 };
 
 const app = initializeApp(firebaseConfig);
