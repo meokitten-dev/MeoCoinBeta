@@ -2,6 +2,13 @@
 
 export const UPDATE_HISTORY = [
   {
+    version: "v4.6 (New)",
+    date: "Vừa xong",
+    title: "Bảo Mật Real-time 🛡️",
+    desc: "Tính năng 'Kick-out'. Nếu tài khoản đăng nhập ở nơi khác, thiết bị cũ sẽ tự động bị đăng xuất để bảo vệ ví.",
+    color: "#ea580c"
+  },
+  {
     version: "v4.5 (New)",
     date: "Vừa xong",
     title: "Hệ Thống Thông Báo Update 🔔",

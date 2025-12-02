@@ -28,7 +28,7 @@ import {
 // import { UPDATE_HISTORY } from './data/updates';
 
 // --- CẤU HÌNH ---
-const CURRENT_VERSION = "v4.5"; 
+const CURRENT_VERSION = "v4.6"; 
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
 
