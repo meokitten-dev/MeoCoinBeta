@@ -52,7 +52,7 @@ export default function MeoCoinNetwork() {
   const [blockchain, setBlockchain] = useState([]); 
   const [totalSupply, setTotalSupply] = useState(0); 
   const [mining, setMining] = useState(false);
-  const [hashRate, setHashRate] = useState(0); // Chỉ là số hiển thị cho vui
+  const [hashRate, setHashRate] = useState(0); 
   const [logs, setLogs] = useState([]);
   const [currentLevel, setCurrentLevel] = useState(1); 
   const [activeTab, setActiveTab] = useState('miner');
@@ -64,6 +64,8 @@ export default function MeoCoinNetwork() {
   const [txStatus, setTxStatus] = useState(null);
 
   const miningIntervalRef = useRef(null);
+  // 👇 Thêm cái chốt này để tránh đào trùng lặp khi đang gửi kết quả
+  const isSubmittingRef = useRef(false);
   const totalSupplyRef = useRef(0);
 
   // --- 1. AUTH & INIT ---
@@ -105,9 +107,8 @@ export default function MeoCoinNetwork() {
     });
   }, [user]);
 
-  // --- 3. SIMULATED MINING (GIẢ LẬP - SIÊU NHẸ) ---
+  // --- 3. SIMULATED MINING (ĐÃ SỬA LỖI DỪNG ĐÀO) ---
   
-  // Tính Level dựa trên Supply (Thay cho Difficulty)
   const calculateLevel = (currentSupply) => {
     if (currentSupply < 50000) return 1; 
     if (currentSupply < 200000) return 2;
@@ -117,15 +118,14 @@ export default function MeoCoinNetwork() {
     return 6;
   };
 
-  // Tính tỉ lệ trúng thưởng dựa trên Level (Càng cao càng khó trúng)
   const getWinChance = (level) => {
     switch(level) {
-      case 1: return 0.2;   // 20% mỗi giây (Dễ)
-      case 2: return 0.1;   // 10% mỗi giây
-      case 3: return 0.05;  // 5% mỗi giây
-      case 4: return 0.02;  // 2% mỗi giây
-      case 5: return 0.01;  // 1% mỗi giây
-      case 6: return 0.001; // 0.1% mỗi giây (Siêu khó)
+      case 1: return 0.2;   
+      case 2: return 0.1;   
+      case 3: return 0.05;  
+      case 4: return 0.02;  
+      case 5: return 0.01;  
+      case 6: return 0.001; 
       default: return 0.01;
     }
   };
@@ -137,43 +137,45 @@ export default function MeoCoinNetwork() {
 
   const startMining = () => {
     if (totalSupplyRef.current >= MAX_SUPPLY) return addLog("Hết coin!", "error");
-    if (mining) return;
+    if (mining) return; // Nếu đang đào thì thôi
     
     setMining(true);
+    isSubmittingRef.current = false; // Đảm bảo chốt mở
     addLog(`🚀 Hệ thống giả lập kích hoạt! Level: ${calculateLevel(totalSupplyRef.current)}`, "info");
 
-    // Dùng setInterval thay vì while(true) -> Không tốn CPU
     miningIntervalRef.current = setInterval(async () => {
-      // 1. Tạo hiệu ứng Hashrate ảo cho vui mắt
-      const fakeHashRate = Math.floor(Math.random() * 500) + 1500; // 1500 - 2000 H/s ảo
+      // 👇 Nếu đang bận gửi kết quả thì bỏ qua lượt này (không dừng hẳn loop)
+      if (isSubmittingRef.current) return;
+
+      const fakeHashRate = Math.floor(Math.random() * 500) + 1500; 
       setHashRate(fakeHashRate);
 
-      // 2. Quay xổ số xem có trúng block không
       const level = calculateLevel(totalSupplyRef.current);
       const chance = getWinChance(level);
-      const roll = Math.random(); // Ra số từ 0.0 đến 1.0
+      const roll = Math.random(); 
 
-      // Nếu trúng số
       if (roll < chance) {
-        // Tạm dừng timer để xử lý (tránh spam server)
-        clearInterval(miningIntervalRef.current); 
+        // 👇 Đóng chốt lại, không cho đào tiếp khi chưa xong việc
+        isSubmittingRef.current = true; 
         
-        const fakeHash = "0000" + Math.random().toString(36).substring(7); // Hash ảo
+        const fakeHash = "0000" + Math.random().toString(36).substring(7); 
         addLog(`✨ MAY MẮN! Tìm thấy Block: ${fakeHash}...`, "success");
         
         await submitBlockToServer();
         
-        // Chờ xíu rồi chạy tiếp
+        // 👇 Mở chốt sau 2 giây để đào tiếp
         setTimeout(() => {
-           if(mining) startMining(); // Đệ quy gián tiếp để chạy lại
+           isSubmittingRef.current = false;
+           // Không cần gọi startMining() lại nữa vì interval vẫn đang chạy ngầm
         }, 2000);
       } 
-    }, 1000); // Chạy mỗi 1 giây (Siêu nhẹ)
+    }, 1000);
   };
 
   const stopMining = () => {
     setMining(false);
     if (miningIntervalRef.current) clearInterval(miningIntervalRef.current);
+    isSubmittingRef.current = false; // Reset chốt
     setHashRate(0);
     addLog("🛑 Đã tắt máy đào.", "warning");
   };
