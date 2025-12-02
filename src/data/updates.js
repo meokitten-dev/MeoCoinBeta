@@ -1,11 +1,6 @@
 // Đây là cuốn nhật ký hành trình của MeoCoin
 
 export const UPDATE_HISTORY = [
-  { version: "v5.0", 
-    date: "Vừa Xong", 
-    title: "Kỷ Nguyên Khám Phá 💎", 
-    desc: "Ra mắt hệ thống Khảo Cổ, Cửa Hàng và Bộ Sưu Tập. Đào ra vật phẩm thay vì chỉ coin!", 
-    color: "#8b5cf6" },
   { version: "v4.9.2", 
     date: "02-12-2025", 
     title: "Trải Nghiệm Cập Nhật Mới 🎁", 
