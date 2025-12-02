@@ -29,7 +29,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
-const appId = 'meocoin-network-v5'; 
+const appId = 'meocoin-network-v4'; 
 
 export default function MeoCoinNetwork() {
   const [user, setUser] = useState(null);
