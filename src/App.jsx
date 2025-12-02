@@ -21,55 +21,18 @@ import {
   limit
 } from 'firebase/firestore';
 import { 
-  // Import icon mới siêu cute
-  PawPrint, Wifi, Send, Activity, Database, ShoppingBag, Copy, Users, RefreshCw, Search, Zap, Hexagon, LogIn, LogOut, Layers, History
+  PawPrint, Wifi, Send, Activity, Database, ShoppingBag, Copy, Users, RefreshCw, Search, Zap, Hexagon, LogIn, LogOut, Layers, History, ArrowUpRight, ArrowDownLeft
 } from 'lucide-react';
+
+// 👇 NHẬP DỮ LIỆU TỪ FILE RIÊNG 👇
+import { UPDATE_HISTORY } from './data/updates';
 
 // --- CẤU HÌNH ---
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
 
-// --- DỮ LIỆU LỊCH SỬ UPDATE ---
-const UPDATE_HISTORY = [
-  {
-    version: "v4.2 (New)",
-    date: "Hôm nay",
-    title: "Giao diện Wonderland 🌸",
-    desc: "Lột xác hoàn toàn với giao diện màu pastel siêu cute, icon chân mèo và hiệu ứng kính mờ (Glassmorphism).",
-    color: "#d946ef"
-  },
-  {
-    version: "v4.0",
-    date: "Hôm qua",
-    title: "Cơ chế Bảo Mật Server 🛡️",
-    desc: "Chuyển toàn bộ logic đào và cộng tiền lên Server API. Chặn đứng các tool hack speed và hack số dư. Thêm hồi chiêu 5s.",
-    color: "#8b5cf6"
-  },
-  {
-    version: "v3.0",
-    date: "Tuần trước",
-    title: "Blockchain Mini & Tổng Cung 🔗",
-    desc: "Tích hợp chuỗi khối hiển thị Hash thực tế. Giới hạn tổng cung 1 triệu coin để tạo sự khan hiếm.",
-    color: "#3b82f6"
-  },
-  {
-    version: "v2.0",
-    date: "Tháng trước",
-    title: "Mạng Lưới P2P & Ví Tiền 💼",
-    desc: "Cho phép nhiều người cùng tham gia mạng lưới. Ra mắt tính năng chuyển tiền qua lại giữa các ví.",
-    color: "#10b981"
-  },
-  {
-    version: "v1.0",
-    date: "Khởi thủy",
-    title: "MeoCoin Ra Đời 🐣",
-    desc: "Phiên bản sơ khai chạy trên trình duyệt. Đánh dấu sự ra đời của đế chế MeoCoin.",
-    color: "#f59e0b"
-  }
-];
-
 // --- FIREBASE SETUP ---
-// 👇 BƯỚC QUAN TRỌNG: Meo điền thông tin của Meo vào đây nhé 👇
+// 👇 ME ĐIỀN CONFIG VÀO ĐÂY NHA 👇
 const firebaseConfig = {
   apiKey: "AIzaSyDrREROquKxOUFf8GfkkMeaALE929MJDRY",
   authDomain: "meo-coin-net.firebaseapp.com",
@@ -98,15 +61,17 @@ export default function MeoCoinNetwork() {
   const [activeTab, setActiveTab] = useState('miner');
   const [loading, setLoading] = useState(true);
   
+  // State Ví
   const [recipientId, setRecipientId] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [txStatus, setTxStatus] = useState(null);
+  const [myTransactions, setMyTransactions] = useState([]); 
 
   const miningIntervalRef = useRef(null);
   const isSubmittingRef = useRef(false);
   const totalSupplyRef = useRef(0);
 
-  // --- LOGIC AUTH ---
+  // --- 1. AUTH & INIT ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
@@ -115,7 +80,7 @@ export default function MeoCoinNetwork() {
     return () => unsubscribe();
   }, []);
 
-  // --- DATA SYNC ---
+  // --- 2. DATA SYNC ---
   useEffect(() => {
     if (!user) return;
     const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
@@ -143,9 +108,23 @@ export default function MeoCoinNetwork() {
         setCurrentLevel(calculateLevel(supply));
       }
     });
+
+    // Lấy lịch sử giao dịch
+    const txQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), orderBy('timestamp', 'desc'), limit(50));
+    onSnapshot(txQuery, (snap) => {
+      const txs = [];
+      snap.forEach(doc => {
+        const data = doc.data();
+        if (data.from === user.uid || data.to === user.uid) {
+          txs.push(data);
+        }
+      });
+      setMyTransactions(txs);
+    });
+
   }, [user]);
 
-  // --- LOGIC TÍNH TOÁN ---
+  // --- 3. MINING ---
   const calculateLevel = (currentSupply) => {
     if (currentSupply < 50000) return 1; 
     if (currentSupply < 200000) return 2;
@@ -195,11 +174,7 @@ export default function MeoCoinNetwork() {
         const fakeHash = "meo" + Math.random().toString(36).substring(7); 
         addLog(`🐾 YAHOO! Nhặt được Block: ${fakeHash}...`, "success");
         await submitBlockToServer();
-        
-        // Nghỉ tay 2s rồi tự đào tiếp (Logic mới fix lỗi)
-        setTimeout(() => { 
-            isSubmittingRef.current = false; 
-        }, 2000);
+        setTimeout(() => { isSubmittingRef.current = false; }, 2000);
       } 
     }, 1000);
   };
@@ -230,7 +205,6 @@ export default function MeoCoinNetwork() {
       addLog(`🍯 +${BLOCK_REWARD} MeoCoin về túi!`, "success");
     } catch (e) { 
       console.error(e); 
-      // Không cần hiện lỗi cooldown nếu server đã chặn, chỉ cần log nhẹ
       if (!e.message.includes("Đào quá nhanh")) {
           addLog(`😿 Lỗi: ${e.message}`, "error"); 
       }
@@ -378,6 +352,38 @@ export default function MeoCoinNetwork() {
                  <button onClick={handleTransfer} className="btn-send">GỬI QUÀ NGAY</button>
                  {txStatus && <div style={{marginTop:'1rem', padding:'1rem', background: txStatus.type==='success'?'#dcfce7':'#fee2e2', color: txStatus.type==='success'?'#166534':'#991b1b', borderRadius:'15px', fontWeight:'600', textAlign:'center'}}>{txStatus.msg}</div>}
                </div>
+
+               {/* BẢNG LỊCH SỬ GIAO DỊCH */}
+               <div className="card">
+                 <h3 style={{marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.8rem', color:'#334155'}}><History size={24} color="#f59e0b"/> Lịch Sử Giao Dịch</h3>
+                 <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
+                   {myTransactions.length === 0 && <div style={{textAlign:'center', color:'#94a3b8', fontStyle:'italic'}}>Chưa có giao dịch nào...</div>}
+                   {myTransactions.map((tx, idx) => {
+                     const isReceive = tx.to === user.uid;
+                     return (
+                       <div key={idx} style={{display:'flex', alignItems:'center', justifyContent:'space-between', paddingBottom:'1rem', borderBottom:'1px solid #f1f5f9'}}>
+                         <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
+                           <div style={{padding:'0.8rem', borderRadius:'12px', background: isReceive ? '#dcfce7' : '#fee2e2', color: isReceive ? '#166534' : '#991b1b'}}>
+                             {isReceive ? <ArrowDownLeft size={20}/> : <ArrowUpRight size={20}/>}
+                           </div>
+                           <div>
+                             <div style={{fontWeight:'700', color:'#334155'}}>{isReceive ? 'Nhận tiền' : 'Chuyển tiền'}</div>
+                             <div style={{fontSize:'0.75rem', color:'#94a3b8'}}>{tx.timestamp ? new Date(tx.timestamp.seconds * 1000).toLocaleString() : 'Just now'}</div>
+                           </div>
+                         </div>
+                         <div style={{textAlign:'right'}}>
+                           <div style={{fontWeight:'800', color: isReceive ? '#166534' : '#991b1b', fontSize:'1.1rem'}}>
+                             {isReceive ? '+' : '-'}{tx.amount} MCN
+                           </div>
+                           <div style={{fontSize:'0.7rem', color:'#64748b', fontFamily:'monospace'}}>
+                             {isReceive ? `Từ: ${(tx.from || '').slice(0,6)}...` : `Đến: ${(tx.to || '').slice(0,6)}...`}
+                           </div>
+                         </div>
+                       </div>
+                     );
+                   })}
+                 </div>
+               </div>
              </div>
           )}
 
@@ -426,7 +432,7 @@ export default function MeoCoinNetwork() {
             </div>
           )}
 
-          {/* TAB LỊCH SỬ UPDATE MỚI CÓNG */}
+          {/* TAB NHẬT KÝ */}
           {activeTab === 'updates' && (
             <div className="explorer-grid">
                <div className="card" style={{gridColumn: '1 / -1'}}>
@@ -436,9 +442,9 @@ export default function MeoCoinNetwork() {
                   <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
                     {UPDATE_HISTORY.map((update, index) => (
                       <div key={index} style={{borderLeft:'4px solid #e2e8f0', paddingLeft:'1.5rem', position:'relative'}}>
-                        <div style={{position:'absolute', left:'-9px', top:'0', width:'14px', height:'14px', borderRadius:'50%', background: index===0 ? '#d946ef' : '#cbd5e1'}}></div>
+                        <div style={{position:'absolute', left:'-9px', top:'0', width:'14px', height:'14px', borderRadius:'50%', background: update.color || '#cbd5e1'}}></div>
                         <div style={{fontWeight:'700', color:'#334155', fontSize:'1.1rem'}}>{update.version} <span style={{fontSize:'0.8rem', color:'#94a3b8', fontWeight:'500'}}>{update.date}</span></div>
-                        <div style={{fontSize:'0.9rem', color:'#f59e0b', fontWeight:'700', margin:'0.2rem 0'}}>{update.title}</div>
+                        <div style={{fontSize:'0.9rem', color: update.color, fontWeight:'700', margin:'0.2rem 0'}}>{update.title}</div>
                         <div style={{color:'#64748b', marginTop:'0.2rem', lineHeight:'1.6', fontSize:'0.9rem'}}>{update.desc}</div>
                       </div>
                     ))}
