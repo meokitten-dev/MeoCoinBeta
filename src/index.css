@@ -1,4 +1,6 @@
-/* Reset cơ bản */
+/* Nhập phông chữ Quicksand tròn trịa dễ thương */
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;600;700&display=swap');
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -6,134 +8,151 @@
 }
 
 body {
-  font-family: 'Courier New', Courier, monospace; /* Font Hacker */
-  background-color: #0a0a0a;
-  color: #22c55e;
-  overflow: hidden; /* Chặn cuộn trang thừa */
+  font-family: 'Quicksand', sans-serif;
+  /* Màu nền Gradient hồng - xanh pastel */
+  background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%); 
+  background-image: linear-gradient(120deg, #fccb90 0%, #d57eeb 100%);
+  color: #4a4a4a;
+  overflow: hidden;
+  height: 100vh;
 }
 
-/* Layout chính */
+/* Layout chính dạng thẻ nổi (Glassmorphism) */
 .app-container {
   display: flex;
-  height: 100vh;
-  width: 100vw;
+  height: 90vh; /* Cách lề một chút cho đẹp */
+  width: 95vw;
+  margin: 5vh auto;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
   overflow: hidden;
 }
 
 /* Sidebar bên trái */
 .sidebar {
   width: 260px;
-  background-color: #171717;
-  border-right: 1px solid #14532d;
+  background: rgba(255, 255, 255, 0.4);
   display: flex;
   flex-direction: column;
-  padding: 1rem;
-  flex-shrink: 0;
+  padding: 1.5rem;
+  border-right: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .logo-area {
-  margin-bottom: 2rem;
+  margin-bottom: 3rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 1.2rem;
-  font-weight: bold;
-  color: #4ade80;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #d946ef; /* Màu hồng đậm */
+  letter-spacing: -0.5px;
 }
 
 .nav-menu {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 1rem;
   flex: 1;
 }
 
 .nav-btn {
   background: transparent;
   border: none;
-  color: #737373;
-  padding: 0.75rem;
+  color: #64748b;
+  padding: 1rem;
   text-align: left;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  border-radius: 0.5rem;
-  transition: all 0.2s;
+  gap: 1rem;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 1rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .nav-btn:hover {
-  background-color: #262626;
-  color: #4ade80;
+  background: rgba(255, 255, 255, 0.5);
+  color: #d946ef;
+  transform: translateX(5px);
 }
 
 .nav-btn.active {
-  background-color: rgba(20, 83, 45, 0.4);
-  color: #86efac;
-  border: 1px solid #14532d;
+  background: linear-gradient(45deg, #f0abfc, #e879f9);
+  color: white;
+  box-shadow: 0 4px 15px rgba(232, 121, 249, 0.4);
 }
 
 .sidebar-footer {
-  border-top: 1px solid #14532d;
-  padding-top: 1rem;
-  font-size: 0.75rem;
-  color: #15803d;
+  background: rgba(255, 255, 255, 0.5);
+  padding: 1rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
 }
 
-/* Nội dung chính bên phải */
+/* Nội dung chính */
 .main-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   position: relative;
-  background-image: linear-gradient(rgba(0, 50, 0, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 50, 0, 0.1) 1px, transparent 1px);
-  background-size: 20px 20px;
+  overflow: hidden;
 }
 
-/* Thanh chỉ số trên cùng (Top bar) */
+/* Thanh chỉ số trên cùng */
 .top-bar {
-  padding: 1rem;
+  padding: 1.5rem 2rem;
   display: flex;
-  gap: 1rem;
-  border-bottom: 1px solid rgba(20, 83, 45, 0.3);
-  background-color: rgba(23, 23, 23, 0.8);
-  backdrop-filter: blur(4px);
+  gap: 1.5rem;
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .stat-box {
   flex: 1;
-  background-color: #171717;
-  border: 1px solid #14532d;
-  padding: 1rem;
-  border-radius: 0.75rem;
+  background: white;
+  padding: 1rem 1.5rem;
+  border-radius: 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   min-width: 200px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+  transition: transform 0.2s;
+  border: 1px solid white;
+}
+
+.stat-box:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px rgba(0,0,0,0.05);
 }
 
 .stat-label {
   font-size: 0.75rem;
-  color: #737373;
+  color: #94a3b8;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 1px;
 }
 
 .stat-value {
-  font-size: 1.25rem;
-  font-weight: bold;
-  color: #fff;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: #334155;
+  margin-top: 0.2rem;
 }
 
-/* Khu vực nội dung cuộn được */
 .content-area {
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: 2rem;
 }
 
-/* --- MÀN HÌNH MINER --- */
+/* --- TRẠM ĐÀO (MINER) CUTE --- */
 .miner-screen {
   display: flex;
   flex-direction: column;
@@ -143,169 +162,160 @@ body {
 }
 
 .miner-circle {
-  width: 250px;
-  height: 250px;
+  width: 280px;
+  height: 280px;
   border-radius: 50%;
-  border: 4px solid #262626;
-  background-color: #171717;
+  background: white;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
   transition: all 0.3s;
+  border: 8px solid #fce7f3; /* Viền hồng nhạt */
+  box-shadow: 0 10px 30px rgba(236, 72, 153, 0.15);
+  position: relative;
 }
 
 .miner-circle.active {
-  border-color: #22c55e;
-  box-shadow: 0 0 30px rgba(34, 197, 94, 0.3);
-  animation: pulse 2s infinite;
+  border-color: #f0abfc;
+  animation: breathe 3s infinite ease-in-out;
 }
 
+/* Nút bấm kẹo ngọt */
 .btn-start {
-  background-color: #16a34a;
-  color: black;
-  font-weight: bold;
-  padding: 0.75rem 2rem;
-  border-radius: 0.5rem;
+  background: linear-gradient(45deg, #34d399, #10b981);
+  color: white;
+  font-weight: 800;
+  padding: 1rem 3rem;
+  border-radius: 50px;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 1rem;
+  font-size: 1.1rem;
+  box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+  transition: all 0.2s;
 }
 
 .btn-start:hover {
-  background-color: #22c55e;
-  transform: scale(1.05);
+  transform: scale(1.05) translateY(-2px);
+  box-shadow: 0 15px 25px rgba(16, 185, 129, 0.4);
 }
 
 .btn-stop {
-  background-color: rgba(127, 29, 29, 0.2);
-  color: #ef4444;
-  border: 1px solid #7f1d1d;
-  font-weight: bold;
-  padding: 0.75rem 2rem;
-  border-radius: 0.5rem;
+  background: linear-gradient(45deg, #f87171, #ef4444);
+  color: white;
+  font-weight: 800;
+  padding: 1rem 3rem;
+  border-radius: 50px;
+  border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-size: 1.1rem;
+  box-shadow: 0 10px 20px rgba(239, 68, 68, 0.3);
+  transition: transform 0.2s;
+}
+
+.btn-stop:hover {
+  transform: scale(1.05);
 }
 
 .console-log {
   width: 100%;
-  background-color: #000;
-  border: 1px solid #14532d;
-  border-radius: 0.5rem;
-  padding: 1rem;
-  height: 200px;
+  background: white;
+  border-radius: 20px;
+  padding: 1.5rem;
+  height: 220px;
   overflow-y: auto;
-  font-family: monospace;
-  font-size: 0.8rem;
-  margin-top: 1rem;
+  font-family: 'Quicksand', sans-serif; /* Không dùng font code nữa */
+  font-weight: 600;
+  font-size: 0.9rem;
+  margin-top: 2rem;
+  box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);
+  border: 1px solid #f1f5f9;
 }
 
-.log-item {
-  margin-bottom: 0.25rem;
-  color: #4ade80;
-}
-.log-success { color: #facc15; }
+.log-item { margin-bottom: 0.5rem; display: flex; gap: 0.5rem; }
+.log-success { color: #f59e0b; }
 .log-error { color: #ef4444; }
 
-/* --- MÀN HÌNH VÍ --- */
-.wallet-screen {
-  max-width: 600px;
-  margin: 0 auto;
-}
-
+/* --- VÍ & EXPLORER --- */
 .card {
-  background-color: #171717;
-  border: 1px solid rgba(20, 83, 45, 0.5);
-  border-radius: 0.75rem;
-  padding: 1.5rem;
+  background: white;
+  border-radius: 24px;
+  padding: 2rem;
   margin-bottom: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+  border: 1px solid #fff;
 }
 
-.input-group {
-  margin-bottom: 1rem;
-}
+.input-group { margin-bottom: 1.5rem; }
 
 .input-field {
   width: 100%;
-  background-color: #000;
-  border: 1px solid #14532d;
-  color: #fff;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  font-family: monospace;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  color: #334155;
+  padding: 1rem;
+  border-radius: 15px;
+  font-family: 'Quicksand', sans-serif;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.input-field:focus {
+  border-color: #d946ef;
+  background: white;
 }
 
 .btn-send {
   width: 100%;
-  background-color: #15803d;
+  background: linear-gradient(45deg, #60a5fa, #3b82f6);
   color: white;
-  padding: 0.75rem;
+  padding: 1rem;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 15px;
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 800;
+  font-size: 1rem;
+  box-shadow: 0 8px 15px rgba(59, 130, 246, 0.3);
+  transition: transform 0.2s;
 }
 
-/* --- MÀN HÌNH EXPLORER --- */
-.explorer-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 1.5rem;
-}
+.btn-send:hover { transform: translateY(-2px); }
 
-.table-container {
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-th {
-  text-align: left;
-  padding: 0.75rem;
-  background-color: rgba(20, 83, 45, 0.2);
-  color: #4ade80;
-}
-
-td {
-  padding: 0.75rem;
-  border-bottom: 1px solid rgba(20, 83, 45, 0.2);
-}
-
-/* Mobile responsive */
-@media (max-width: 768px) {
-  .app-container { flex-direction: column; }
-  .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid #14532d; }
-  .nav-menu { flex-direction: row; overflow-x: auto; }
-  .explorer-grid { grid-template-columns: 1fr; }
-  .top-bar { flex-wrap: wrap; }
-}
+table { width: 100%; border-collapse: separate; border-spacing: 0 0.5rem; }
+th { text-align: left; padding: 1rem; color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; }
+td { padding: 1rem; background: #f8fafc; color: #334155; font-weight: 600; }
+tr td:first-child { border-top-left-radius: 12px; border-bottom-left-radius: 12px; }
+tr td:last-child { border-top-right-radius: 12px; border-bottom-right-radius: 12px; }
 
 /* Animations */
 @keyframes bounce {
   0%, 100% { transform: translateY(-5%); }
   50% { transform: translateY(0); }
 }
-.animate-bounce { animation: bounce 1s infinite; }
+.animate-bounce { animation: bounce 2s infinite ease-in-out; }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .5; }
+@keyframes breathe {
+  0%, 100% { transform: scale(1); box-shadow: 0 10px 30px rgba(236, 72, 153, 0.15); }
+  50% { transform: scale(1.05); box-shadow: 0 20px 50px rgba(236, 72, 153, 0.3); }
 }
-.animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .animate-spin { animation: spin 1s linear infinite; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .app-container { flexDirection: column; height: 100vh; width: 100vw; margin: 0; border-radius: 0; }
+  .sidebar { width: 100%; height: auto; border-right: none; border-bottom: 1px solid white; padding: 1rem; }
+  .nav-menu { flex-direction: row; overflow-x: auto; padding-bottom: 0.5rem; }
+  .nav-btn { padding: 0.5rem 1rem; font-size: 0.9rem; white-space: nowrap; }
+  .logo-area { margin-bottom: 1rem; font-size: 1.2rem; }
+  .content-area { padding: 1rem; }
+}
