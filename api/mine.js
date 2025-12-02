@@ -13,7 +13,7 @@ const db = getFirestore();
 const VERSION = 'meocoin-network-v4'; 
 const MAX_SUPPLY = 1000000;
 const BLOCK_REWARD = 10; 
-const COOLDOWN_MS = 5000; // ⏱️ Hồi chiêu 5 giây
+const COOLDOWN_MS = 5000; // 5 giây hồi chiêu
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -33,9 +33,8 @@ export default async function handler(req, res) {
       const statsDoc = await t.get(statsRef);
       const currentSupply = statsDoc.exists ? (statsDoc.data().totalSupply || 0) : 0;
 
-      if (currentSupply + BLOCK_REWARD > MAX_SUPPLY) throw new Error("Đã hết coin để đào!");
+      if (currentSupply + BLOCK_REWARD > MAX_SUPPLY) throw new Error("MAX_SUPPLY_REACHED");
 
-      // Lấy thông tin user để kiểm tra hồi chiêu
       const userDoc = await t.get(userRef);
       const now = Date.now();
 
@@ -43,13 +42,13 @@ export default async function handler(req, res) {
         const userData = userDoc.data();
         const lastMined = userData.lastMinedAt ? userData.lastMinedAt.toMillis() : 0;
         
-        // 🛑 KIỂM TRA HỒI CHIÊU TẠI ĐÂY
+        // Kiểm tra hồi chiêu
         if (now - lastMined < COOLDOWN_MS) {
-          throw new Error("⏳ Đào quá nhanh! Vui lòng đợi 5 giây.");
+          throw new Error("COOLDOWN"); // Ném mã lỗi ngắn gọn để catch bên dưới
         }
       }
 
-      // Logic tạo hash ảo (Fake Chain)
+      // Logic tạo block (Fake chain)
       const latestSnapshot = await t.get(blocksRef.orderBy('index', 'desc').limit(1));
       let prevHash = "genesis-block";
       let newIndex = 1;
@@ -62,7 +61,6 @@ export default async function handler(req, res) {
 
       const randomHash = '0000' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
-      // Cập nhật User (Thêm trường lastMinedAt)
       if (!userDoc.exists) {
         t.set(userRef, {
           address: userId,
@@ -73,14 +71,14 @@ export default async function handler(req, res) {
           blocksMined: 1,
           joinedAt: FieldValue.serverTimestamp(),
           lastSeen: FieldValue.serverTimestamp(),
-          lastMinedAt: FieldValue.serverTimestamp() // Ghi lại thời gian đào
+          lastMinedAt: FieldValue.serverTimestamp()
         });
       } else {
         t.update(userRef, {
           balance: FieldValue.increment(BLOCK_REWARD),
           blocksMined: FieldValue.increment(1),
           lastSeen: FieldValue.serverTimestamp(),
-          lastMinedAt: FieldValue.serverTimestamp() // Cập nhật thời gian đào mới nhất
+          lastMinedAt: FieldValue.serverTimestamp()
         });
       }
 
@@ -102,10 +100,15 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true });
 
   } catch (error) {
-    // Không log lỗi cooldown ra console server để đỡ rác log, chỉ trả về client
-    if (!error.message.includes("Đào quá nhanh")) {
-        console.error("Mining Error:", error);
+    // Xử lý lỗi thông minh hơn để không spam 500
+    if (error.message === "COOLDOWN") {
+        return res.status(429).json({ error: "⏳ Đào quá nhanh! Đợi 5s nhé." });
     }
-    return res.status(500).json({ error: error.message });
+    if (error.message === "MAX_SUPPLY_REACHED") {
+        return res.status(400).json({ error: "⚠️ Đã hết coin để đào!" });
+    }
+
+    console.error("Mining Error:", error);
+    return res.status(500).json({ error: "Lỗi hệ thống: " + error.message });
   }
 }

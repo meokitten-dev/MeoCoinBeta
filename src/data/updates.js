@@ -2,7 +2,14 @@
 
 export const UPDATE_HISTORY = [
   {
-    version: "v4.3 (New)",
+    version: "v4.4 (New)",
+    date: "Vừa xong",
+    title: "Chế Độ Đơn Nhiệm & Tối Ưu Log 🚀",
+    desc: "Ngăn chặn việc mở nhiều tab cùng lúc để bảo vệ dữ liệu. Làm sạch Console, ẩn các lỗi kỹ thuật không cần thiết.",
+    color: "#f43f5e"
+  },
+  {
+    version: "v4.3",
     date: "02-12-2025",
     title: "Lịch Sử Giao Dịch & Tách File 📂",
     desc: "Thêm tính năng xem dòng tiền vào/ra. Tái cấu trúc code: tách dữ liệu lịch sử sang file riêng để dễ quản lý.",

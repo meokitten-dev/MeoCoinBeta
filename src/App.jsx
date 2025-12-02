@@ -21,18 +21,17 @@ import {
   limit
 } from 'firebase/firestore';
 import { 
-  PawPrint, Wifi, Send, Activity, Database, ShoppingBag, Copy, Users, RefreshCw, Search, Zap, Hexagon, LogIn, LogOut, Layers, History, ArrowUpRight, ArrowDownLeft
+  PawPrint, Wifi, Send, Activity, Database, ShoppingBag, Copy, Users, RefreshCw, Search, Zap, Hexagon, LogIn, LogOut, Layers, History, ArrowUpRight, ArrowDownLeft, AlertTriangle
 } from 'lucide-react';
 
-// 👇 NHẬP DỮ LIỆU TỪ FILE RIÊNG 👇
+// 👇 NHẬP DỮ LIỆU TỪ FILE RIÊNG (Meo nhớ tạo file này nhé) 👇
 import { UPDATE_HISTORY } from './data/updates';
 
 // --- CẤU HÌNH ---
 const BLOCK_REWARD = 10; 
 const MAX_SUPPLY = 1000000; 
 
-// --- FIREBASE SETUP ---
-// 👇 ME ĐIỀN CONFIG VÀO ĐÂY NHA 👇
+// --- FIREBASE SETUP (Đã điền config của Meo) ---
 const firebaseConfig = {
   apiKey: "AIzaSyDrREROquKxOUFf8GfkkMeaALE929MJDRY",
   authDomain: "meo-coin-net.firebaseapp.com",
@@ -67,22 +66,45 @@ export default function MeoCoinNetwork() {
   const [txStatus, setTxStatus] = useState(null);
   const [myTransactions, setMyTransactions] = useState([]); 
 
+  // State chặn nhiều tab
+  const [isDuplicateTab, setIsDuplicateTab] = useState(false);
+
   const miningIntervalRef = useRef(null);
   const isSubmittingRef = useRef(false);
   const totalSupplyRef = useRef(0);
 
-  // --- 1. AUTH & INIT ---
+  // --- 1. AUTH & SINGLE TAB LOGIC ---
   useEffect(() => {
+    // Kênh liên lạc giữa các tab
+    const channel = new BroadcastChannel('meocoin_channel');
+
+    // Gửi tin nhắn: "Tôi mới vào nè!"
+    channel.postMessage({ type: 'NEW_TAB_OPENED' });
+
+    // Lắng nghe tin nhắn
+    channel.onmessage = (event) => {
+      if (event.data.type === 'NEW_TAB_OPENED') {
+        // Nếu có tab mới mở, tab hiện tại (cũ) sẽ tự khóa
+        setIsDuplicateTab(true);
+        stopMining(); // Dừng đào ngay lập tức
+      }
+    };
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    return () => {
+      unsubscribe();
+      channel.close();
+    };
   }, []);
 
   // --- 2. DATA SYNC ---
   useEffect(() => {
-    if (!user) return;
+    if (!user || isDuplicateTab) return; // Nếu bị khóa thì không sync nữa
+    
     const userRef = doc(db, 'artifacts', appId, 'public', 'data', 'users', user.uid);
     onSnapshot(userRef, (doc) => { if (doc.exists()) setBalance(doc.data().balance || 0); });
 
@@ -109,7 +131,6 @@ export default function MeoCoinNetwork() {
       }
     });
 
-    // Lấy lịch sử giao dịch
     const txQuery = query(collection(db, 'artifacts', appId, 'public', 'data', 'transactions'), orderBy('timestamp', 'desc'), limit(50));
     onSnapshot(txQuery, (snap) => {
       const txs = [];
@@ -122,7 +143,7 @@ export default function MeoCoinNetwork() {
       setMyTransactions(txs);
     });
 
-  }, [user]);
+  }, [user, isDuplicateTab]);
 
   // --- 3. MINING ---
   const calculateLevel = (currentSupply) => {
@@ -152,6 +173,7 @@ export default function MeoCoinNetwork() {
   };
 
   const startMining = () => {
+    if (isDuplicateTab) return; // Chặn nếu đang bị khóa
     if (totalSupplyRef.current >= MAX_SUPPLY) return addLog("Hết coin rồi Meo ơi!", "error");
     if (mining) return;
     
@@ -160,7 +182,7 @@ export default function MeoCoinNetwork() {
     addLog(`🌸 Đã bật máy đào! Cấp độ: ${calculateLevel(totalSupplyRef.current)}`, "info");
 
     miningIntervalRef.current = setInterval(async () => {
-      if (isSubmittingRef.current) return;
+      if (isSubmittingRef.current || isDuplicateTab) return; // Kiểm tra thêm cờ duplicate
 
       const fakeHashRate = Math.floor(Math.random() * 500) + 1500; 
       setHashRate(fakeHashRate);
@@ -174,7 +196,10 @@ export default function MeoCoinNetwork() {
         const fakeHash = "meo" + Math.random().toString(36).substring(7); 
         addLog(`🐾 YAHOO! Nhặt được Block: ${fakeHash}...`, "success");
         await submitBlockToServer();
-        setTimeout(() => { isSubmittingRef.current = false; }, 2000);
+        
+        setTimeout(() => { 
+            isSubmittingRef.current = false; 
+        }, 2000);
       } 
     }, 1000);
   };
@@ -184,7 +209,8 @@ export default function MeoCoinNetwork() {
     if (miningIntervalRef.current) clearInterval(miningIntervalRef.current);
     isSubmittingRef.current = false;
     setHashRate(0);
-    addLog("💤 Meo đi ngủ đây...", "warning");
+    // Chỉ log nếu chưa bị khóa tab
+    if (!isDuplicateTab) addLog("💤 Meo đi ngủ đây...", "warning");
   };
 
   const submitBlockToServer = async () => {
@@ -201,16 +227,25 @@ export default function MeoCoinNetwork() {
         })
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Lỗi Server");
-      addLog(`🍯 +${BLOCK_REWARD} MeoCoin về túi!`, "success");
-    } catch (e) { 
-      console.error(e); 
-      if (!e.message.includes("Đào quá nhanh")) {
-          addLog(`😿 Lỗi: ${e.message}`, "error"); 
+      
+      if (!response.ok) {
+        // Nếu là lỗi hồi chiêu, không cần log ra console đỏ lòm nữa
+        if (response.status === 429) {
+            addLog("⏳ Đào nhanh quá! Đợi xíu...", "error");
+        } else {
+            throw new Error(result.error || "Lỗi Server");
+        }
+      } else {
+        addLog(`🍯 +${BLOCK_REWARD} MeoCoin về túi!`, "success");
       }
+    } catch (e) { 
+      // Chỉ log lỗi thật sự
+      console.error("Mining Error:", e);
+      addLog(`😿 Lỗi: ${e.message}`, "error"); 
     }
   };
 
+  // ... (Phần handleTransfer và handleGoogleLogin giữ nguyên) ...
   const handleTransfer = async (e) => {
     e.preventDefault();
     setTxStatus(null);
@@ -244,6 +279,22 @@ export default function MeoCoinNetwork() {
   const handleGoogleLogin = async () => {
     try { await signInWithPopup(auth, googleProvider); } catch (e) { alert(e.message); }
   };
+
+  // --- GIAO DIỆN CHẶN NHIỀU TAB ---
+  if (isDuplicateTab) {
+    return (
+      <div style={{height:'100vh', background:'#fee2e2', color:'#991b1b', display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center', gap:'1.5rem', textAlign:'center', padding:'2rem'}}>
+        <AlertTriangle size={64} className="animate-bounce"/>
+        <div>
+          <h1 style={{fontSize:'2rem', fontWeight:'bold', marginBottom:'0.5rem'}}>Ứng dụng đang mở ở tab khác!</h1>
+          <p>Để bảo mật và tránh lỗi dữ liệu, MeoCoin chỉ cho phép chạy trên một tab duy nhất.</p>
+        </div>
+        <button onClick={() => window.location.reload()} style={{background:'#991b1b', color:'white', border:'none', padding:'1rem 2rem', borderRadius:'50px', cursor:'pointer', fontWeight:'bold', fontSize:'1rem'}}>
+          Sử dụng ở tab này
+        </button>
+      </div>
+    );
+  }
 
   if (loading) return <div style={{height:'100vh', background:'#fce7f3', color:'#db2777', display:'flex', justifyContent:'center', alignItems:'center', fontWeight:'bold'}}>Đang gọi mèo về... <RefreshCw className="animate-spin" style={{marginLeft:'10px'}}/></div>;
 
@@ -367,7 +418,7 @@ export default function MeoCoinNetwork() {
                              {isReceive ? <ArrowDownLeft size={20}/> : <ArrowUpRight size={20}/>}
                            </div>
                            <div>
-                             <div style={{fontWeight:'700', color:'#334155'}}>{isReceive ? 'Nhận Meow' : 'Chuyển Meow'}</div>
+                             <div style={{fontWeight:'700', color:'#334155'}}>{isReceive ? 'Nhận Coin' : 'Chuyển Coin'}</div>
                              <div style={{fontSize:'0.75rem', color:'#94a3b8'}}>{tx.timestamp ? new Date(tx.timestamp.seconds * 1000).toLocaleString() : 'Just now'}</div>
                            </div>
                          </div>
