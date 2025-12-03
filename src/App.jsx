@@ -252,11 +252,26 @@ export default function MeoCoinNetwork() {
         body: JSON.stringify({ userId: user.uid, minerName: user.displayName, userEmail: user.email, userPhoto: user.photoURL })
       });
       const result = await response.json();
+      
       if (!response.ok) {
         if (response.status === 429) addLog("⏳ Đào nhanh quá! Đợi xíu...", "error");
         else throw new Error(result.error || "Lỗi Server");
       } else {
-        addLog(`🍯 +${BLOCK_REWARD} MeoCoin về túi!`, "success");
+        // 👇 KIỂM TRA LOGIC MỚI Ở ĐÂY 👇
+        if (result.success && result.loot) {
+            // Nếu đào thành công và có vật phẩm
+            const { name, emoji, reward } = result.loot;
+            // Hiển thị log đẹp hơn tùy vào độ hiếm (dựa vào reward)
+            let logType = "info";
+            if (reward >= 50) logType = "success"; // Vàng trở lên thì log màu xanh lá
+            if (reward >= 200) logType = "warning"; // Kim cương thì (tạm dùng màu vàng/warning để nổi bật)
+
+            addLog(`${emoji} Tìm thấy: ${name} (+${reward} MCN)`, logType);
+        } else if (result.code === "COOLDOWN") {
+            addLog(result.message, "error");
+        } else {
+            addLog(result.message || "Có lỗi xảy ra", "error");
+        }
       }
     } catch (e) { console.error(e); addLog(`😿 Lỗi: ${e.message}`, "error"); }
   };
